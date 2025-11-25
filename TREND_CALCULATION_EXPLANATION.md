@@ -475,3 +475,4 @@ The system provides 6 different trend periods (5m, 1h, 6h, 24h, 7d, 1m) to show 
 
 
 
+

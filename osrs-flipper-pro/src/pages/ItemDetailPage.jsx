@@ -20,9 +20,7 @@ import {
     formatColoredNumber,
     formatRoi,
     timeAgo,
-    slugToName,
 } from "../utils/formatting";
-import CanonicalDataDisplay from "../components/CanonicalDataDisplay";
 
 ChartJS.register(
     LineElement,
@@ -37,6 +35,8 @@ ChartJS.register(
 );
 
 const API_BASE = "http://localhost:3001";
+
+const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '7d', '1m'];
 
 const timeOptions = [
     { label: '4H', ms: 4 * 3600e3, granularity: '4h' },
@@ -71,18 +71,22 @@ export default function ItemDetailPage() {
             itemNameSlug = decoded;
         }
     }
-    const [priceData, setPriceData] = useState([]);
+
+    // Section 1 - Basic (Live Market Data)
+    const [basicData, setBasicData] = useState(null);
+    const [basicLoading, setBasicLoading] = useState(true);
+
+    // Section 2 - Advanced (Granularity-Based)
     const [canonicalData, setCanonicalData] = useState(null);
+    const [selectedGranularity, setSelectedGranularity] = useState('5m');
+    const [advancedLoading, setAdvancedLoading] = useState(true);
+
+    // Chart and Recent Trades
+    const [priceData, setPriceData] = useState([]);
     const [recentTrades, setRecentTrades] = useState([]);
     const [timeRange, setTimeRange] = useState('12H');
-    const [loading, setLoading] = useState(true);
 
-    console.log("ItemDetailPage rendered with item slug:", itemNameSlug);
-
-    const selected = timeOptions.find(o => o.label === timeRange);
-    const granularity = selected ? selected.granularity : '5m';
-
-    // Fetch canonical data by ID (preferred) or name
+    // Fetch canonical data first to get item_id and limit
     useEffect(() => {
         if (!numericItemId && !itemNameSlug) return;
 
@@ -94,23 +98,88 @@ export default function ItemDetailPage() {
                 if (res.ok) {
                     const data = await res.json();
                     setCanonicalData(data);
+                    setAdvancedLoading(false);
                 } else {
                     const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
                     console.error("Error fetching canonical data:", res.status, errorData);
+                    setAdvancedLoading(false);
                 }
             } catch (err) {
                 console.error("Error fetching canonical data:", err);
-            } finally {
-                setLoading(false);
+                setAdvancedLoading(false);
             }
         };
 
         fetchCanonical();
     }, [numericItemId, itemNameSlug]);
 
+    // Fetch basic (live) data from /api/prices/latest/:id
+    useEffect(() => {
+        if (!canonicalData || !canonicalData.item_id) return;
+
+        const fetchBasic = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/prices/latest/${canonicalData.item_id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    // Calculate required fields from instant prices
+                    const high = data.high;
+                    const low = data.low;
+                    const high_timestamp = data.ts; // high timestamp
+                    const low_timestamp = data.lowTs; // low timestamp
+                    
+                    // Only calculate if we have both high and low
+                    let margin = null;
+                    let roi_percent = null;
+                    let spread_percent = null;
+                    let max_profit = null;
+                    let max_investment = null;
+                    const limit = canonicalData.limit || null; // From items table (via canonical_items)
+                    
+                    if (high != null && low != null) {
+                        margin = Math.floor(high * 0.98) - low;
+                        roi_percent = low > 0 ? (margin / low) * 100 : 0;
+                        spread_percent = high > 0 ? ((high - low) / high) * 100 : 0;
+                        max_profit = margin * (limit || 0);
+                        max_investment = low * (limit || 0);
+                    }
+
+                    setBasicData({
+                        high,
+                        low,
+                        high_timestamp,
+                        low_timestamp,
+                        margin,
+                        roi_percent,
+                        spread_percent,
+                        limit,
+                        max_profit,
+                        max_investment,
+                    });
+                    setBasicLoading(false);
+                } else {
+                    console.error("Error fetching basic data:", res.status);
+                    setBasicLoading(false);
+                }
+            } catch (err) {
+                console.error("Error fetching basic data:", err);
+                setBasicLoading(false);
+            }
+        };
+
+        fetchBasic();
+        // Update every 15 seconds
+        const interval = setInterval(fetchBasic, 15000);
+        return () => clearInterval(interval);
+    }, [canonicalData]);
+
     // Fetch chart data
     useEffect(() => {
         if (!canonicalData || !canonicalData.item_id) return;
+
+        const selected = timeOptions.find(o => o.label === timeRange);
+        const granularity = selected ? selected.granularity : '5m';
 
         const fetchChart = () => {
             fetch(`${API_BASE}/api/prices/chart/${granularity}/${canonicalData.item_id}`)
@@ -122,7 +191,7 @@ export default function ItemDetailPage() {
         fetchChart();
         const int = setInterval(fetchChart, 15000);
         return () => clearInterval(int);
-    }, [canonicalData, granularity, timeRange]);
+    }, [canonicalData, timeRange]);
 
     // Fetch recent trades
     useEffect(() => {
@@ -140,6 +209,53 @@ export default function ItemDetailPage() {
         return () => clearInterval(int);
     }, [canonicalData]);
 
+    if (basicLoading || advancedLoading) {
+        return (
+            <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
+                <p>Loading item data...</p>
+            </div>
+        );
+    }
+
+    if (!canonicalData) {
+        return (
+            <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
+                <p>Item not found</p>
+            </div>
+        );
+    }
+
+    const icon = canonicalData.icon || `${canonicalData.name}.png`;
+    const safe = encodeURIComponent(icon.replace(/ /g, "_"));
+
+    // Get metrics for selected granularity from canonical data
+    const getGranularityMetrics = (gran) => {
+        const metrics = {
+            volume: canonicalData[`volume_${gran}`] || null,
+            turnover: canonicalData[`turnover_${gran}`] || null,
+            trend: canonicalData[`trend_${gran}`] || null,
+            buy_sell_rate: canonicalData[`buy_sell_rate_${gran}`] || null,
+            price_high: null,
+            price_low: null,
+        };
+
+        // Price fields only exist for 5m and 1h
+        if (gran === '5m') {
+            metrics.price_high = canonicalData.price_5m_high || null;
+            metrics.price_low = canonicalData.price_5m_low || null;
+        } else if (gran === '1h') {
+            metrics.price_high = canonicalData.price_1h_high || null;
+            metrics.price_low = canonicalData.price_1h_low || null;
+        }
+
+        return metrics;
+    };
+
+    const granularityMetrics = getGranularityMetrics(selectedGranularity);
+
+    // Chart calculations
+    const selected = timeOptions.find(o => o.label === timeRange);
+    const granularity = selected ? selected.granularity : '5m';
     const now = Date.now();
     const minTime = selected ? now - selected.ms : 0;
     const filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
@@ -302,28 +418,10 @@ export default function ItemDetailPage() {
         }
     };
 
-    if (loading) {
-        return (
-            <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
-                <p>Loading item data...</p>
-            </div>
-        );
-    }
-
-    if (!canonicalData) {
-        return (
-            <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
-                <p>Item not found</p>
-            </div>
-        );
-    }
-
-    const icon = canonicalData.icon || `${canonicalData.name}.png`;
-    const safe = encodeURIComponent(icon.replace(/ /g, "_"));
-
     return (
         <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "32px" }}>
                 <img
                     src={`${baseIconURL}/${safe}/64px-${safe}`}
                     alt={canonicalData.name}
@@ -332,77 +430,247 @@ export default function ItemDetailPage() {
                     style={{ borderRadius: 8, objectFit: "contain" }}
                     onError={(e) => (e.currentTarget.style.display = "none")}
                 />
-                <div>
+                <div style={{ flex: 1 }}>
                     <h1 style={{ margin: 0, fontSize: "32px" }}>{canonicalData.name}</h1>
-                    {canonicalData.high && canonicalData.low && (
+                    {basicData && basicData.high && basicData.low && (
                         <p style={{ margin: "8px 0 0 0", fontSize: "18px", color: "#374151" }}>
-                            Buy: {formatPriceFull(canonicalData.low)} gp | Sell: {formatPriceFull(canonicalData.high)} gp
+                            Buy: {formatPriceFull(basicData.low)} gp | Sell: {formatPriceFull(basicData.high)} gp
                         </p>
                     )}
                 </div>
             </div>
 
-            {/* Granularity buttons */}
-            <div style={{ marginBottom: 16 }}>
-                {timeOptions.map(({ label }) => (
-                    <button
-                        key={label}
-                        onClick={() => setTimeRange(label)}
-                        style={{
-                            marginRight: 6,
-                            padding: '6px 10px',
-                            background: label === timeRange ? '#1e1e1e' : '#f0f0f0',
-                            color: label === timeRange ? '#fff' : '#000',
-                            borderRadius: 4,
-                            border: label === timeRange ? '2px solid #444' : '1px solid #ccc',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {label}
-                    </button>
-                ))}
+            {/* Price Chart */}
+            <div style={sectionContainerStyle}>
+                <h2 style={sectionTitleStyle}>Price Chart</h2>
+                
+                {/* Time range buttons */}
+                <div style={{ marginBottom: 16 }}>
+                    {timeOptions.map(({ label }) => (
+                        <button
+                            key={label}
+                            onClick={() => setTimeRange(label)}
+                            style={{
+                                marginRight: 6,
+                                padding: '6px 10px',
+                                background: label === timeRange ? '#1e1e1e' : '#f0f0f0',
+                                color: label === timeRange ? '#fff' : '#000',
+                                borderRadius: 4,
+                                border: label === timeRange ? '2px solid #444' : '1px solid #ccc',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Chart */}
+                {filtered.length === 0 ? (
+                    <p>No price data available in selected range.</p>
+                ) : (
+                    <div style={{ height: '60vh', marginBottom: "32px" }}>
+                        <Line data={chartData} options={chartOptions} />
+                    </div>
+                )}
             </div>
 
-            {/* Chart */}
-            {filtered.length === 0 ? (
-                <p>No price data available in selected range.</p>
-            ) : (
-                <div style={{ height: '60vh', marginBottom: "32px" }}>
-                    <Line data={chartData} options={chartOptions} />
-                </div>
-            )}
-
             {/* Recent Trades */}
-            <h2 style={{ marginTop: "32px", marginBottom: "16px" }}>Recent Trades</h2>
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: "32px" }}>
-                <thead>
-                    <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Time</th>
-                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Type</th>
-                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Price</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {recentTrades.map((t, i) => {
-                        const isBuy = t.type === 'buy';
-                        const label = isBuy ? 'BUY' : 'SELL';
-                        const rowColor = isBuy ? '#eaffea' : '#ffeaea';
-                        const textColor = isBuy ? '#007a00' : '#b20000';
-                        return (
-                            <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
-                                <td style={{ padding: "10px 12px" }}>{new Date(t.ts * 1000).toLocaleTimeString()}</td>
-                                <td style={{ padding: "10px 12px" }}>{label}</td>
-                                <td style={{ padding: "10px 12px" }}>{t.price.toLocaleString()} gp</td>
+            <div style={sectionContainerStyle}>
+                <h2 style={sectionTitleStyle}>Recent Trades</h2>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                            <th align="left" style={{ padding: "12px", textAlign: "left" }}>Time</th>
+                            <th align="left" style={{ padding: "12px", textAlign: "left" }}>Type</th>
+                            <th align="left" style={{ padding: "12px", textAlign: "left" }}>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {recentTrades.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#6b7280" }}>
+                                    No recent trades available
+                                </td>
                             </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                        ) : (
+                            recentTrades.map((t, i) => {
+                                const isBuy = t.type === 'buy';
+                                const label = isBuy ? 'BUY' : 'SELL';
+                                const rowColor = isBuy ? '#eaffea' : '#ffeaea';
+                                const textColor = isBuy ? '#007a00' : '#b20000';
+                                return (
+                                    <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
+                                        <td style={{ padding: "10px 12px" }}>{new Date(t.ts * 1000).toLocaleTimeString()}</td>
+                                        <td style={{ padding: "10px 12px" }}>{label}</td>
+                                        <td style={{ padding: "10px 12px" }}>{t.price.toLocaleString()} gp</td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
 
-            {/* Canonical Data Display */}
-            <h2 style={{ marginTop: "32px", marginBottom: "16px" }}>Item Data</h2>
-            <CanonicalDataDisplay data={canonicalData} />
+            {/* SECTION 1 — BASIC (LIVE MARKET DATA) */}
+            <div style={sectionContainerStyle}>
+                <h2 style={sectionTitleStyle}>Basic (Live Market Data)</h2>
+                {basicData ? (
+                    <div style={gridStyle}>
+                        <Field label="High (Instant Sell)" value={formatPriceFull(basicData.high)} />
+                        <Field label="Low (Instant Buy)" value={formatPriceFull(basicData.low)} />
+                        <Field label="High Timestamp" value={timeAgo(basicData.high_timestamp)} />
+                        <Field label="Low Timestamp" value={timeAgo(basicData.low_timestamp)} />
+                        <Field label="Margin" value={formatColoredNumber(basicData.margin)} />
+                        <Field label="ROI %" value={formatRoi(basicData.roi_percent)} />
+                        <Field label="Spread %" value={formatRoi(basicData.spread_percent)} />
+                        <Field label="Limit" value={basicData.limit ? basicData.limit.toLocaleString() : "–"} />
+                        <Field label="Max Profit" value={formatColoredNumber(basicData.max_profit)} />
+                        <Field label="Max Investment" value={formatPriceFull(basicData.max_investment)} />
+                    </div>
+                ) : (
+                    <p>No live market data available</p>
+                )}
+            </div>
+
+            {/* SECTION 2 — ADVANCED (GRANULARITY-BASED) */}
+            <div style={sectionContainerStyle}>
+                <h2 style={sectionTitleStyle}>Advanced (Granularity-Based Market Analysis)</h2>
+                
+                {/* Granularity Selector */}
+                <div style={{ marginBottom: "24px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {GRANULARITY_OPTIONS.map((gran) => (
+                        <button
+                            key={gran}
+                            onClick={() => setSelectedGranularity(gran)}
+                            style={{
+                                padding: '8px 16px',
+                                background: gran === selectedGranularity ? '#1e1e1e' : '#f0f0f0',
+                                color: gran === selectedGranularity ? '#fff' : '#000',
+                                borderRadius: 4,
+                                border: gran === selectedGranularity ? '2px solid #444' : '1px solid #ccc',
+                                cursor: 'pointer',
+                                fontWeight: gran === selectedGranularity ? 600 : 400,
+                            }}
+                        >
+                            {gran}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Display metrics for selected granularity */}
+                <div style={gridStyle}>
+                    <Field 
+                        label={`Volume (${selectedGranularity})`} 
+                        value={granularityMetrics.volume != null ? formatCompact(granularityMetrics.volume) : "–"} 
+                    />
+                    <Field 
+                        label={`Turnover (${selectedGranularity})`} 
+                        value={granularityMetrics.turnover != null ? formatCompact(granularityMetrics.turnover) : "–"} 
+                    />
+                    <Field 
+                        label={`Trend (${selectedGranularity})`} 
+                        value={formatRoi(granularityMetrics.trend)} 
+                    />
+                    {granularityMetrics.buy_sell_rate != null && (
+                        <Field 
+                            label={`Buy/Sell Rate (${selectedGranularity})`} 
+                            value={
+                                <span style={{ 
+                                    color: granularityMetrics.buy_sell_rate < 1 ? "#dc2626" : "#16a34a",
+                                    fontFamily: "monospace"
+                                }}>
+                                    {parseFloat(granularityMetrics.buy_sell_rate).toFixed(2)}
+                                </span>
+                            } 
+                        />
+                    )}
+                    {granularityMetrics.price_high != null && (
+                        <Field 
+                            label={`Price High (${selectedGranularity})`} 
+                            value={formatPriceFull(granularityMetrics.price_high)} 
+                        />
+                    )}
+                    {granularityMetrics.price_low != null && (
+                        <Field 
+                            label={`Price Low (${selectedGranularity})`} 
+                            value={formatPriceFull(granularityMetrics.price_low)} 
+                        />
+                    )}
+                </div>
+
+                {/* Additional trend fields (3m and 1y) - not granularity-specific */}
+                {(canonicalData.trend_3m != null || canonicalData.trend_1y != null) && (
+                    <div style={{ marginTop: "24px" }}>
+                        <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px", color: "#374151" }}>
+                            Extended Trends
+                        </h3>
+                        <div style={gridStyle}>
+                            {canonicalData.trend_3m != null && (
+                                <Field label="Trend (3m)" value={formatRoi(canonicalData.trend_3m)} />
+                            )}
+                            {canonicalData.trend_1y != null && (
+                                <Field label="Trend (1y)" value={formatRoi(canonicalData.trend_1y)} />
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
+// Field component for displaying label-value pairs
+function Field({ label, value }) {
+    return (
+        <div style={fieldStyle}>
+            <div style={labelStyle}>{label}</div>
+            <div style={valueStyle}>{value}</div>
+        </div>
+    );
+}
+
+// Styles
+const sectionContainerStyle = {
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "8px",
+    padding: "24px",
+    marginBottom: "32px",
+    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+};
+
+const sectionTitleStyle = {
+    margin: "0 0 24px 0",
+    fontSize: "24px",
+    fontWeight: 600,
+    color: "#111827",
+    borderBottom: "2px solid #e5e7eb",
+    paddingBottom: "12px",
+};
+
+const gridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+    gap: "20px",
+};
+
+const fieldStyle = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+};
+
+const labelStyle = {
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+};
+
+const valueStyle = {
+    fontSize: "16px",
+    fontWeight: 500,
+    color: "#111827",
+};

@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS canonical_items (
   trend_24h NUMERIC(10,2),
   trend_7d NUMERIC(10,2),
   trend_1m NUMERIC(10,2),
+  trend_3m NUMERIC(10,2),
+  trend_1y NUMERIC(10,2),
   
   -- Metadata
   timestamp_updated INTEGER NOT NULL
