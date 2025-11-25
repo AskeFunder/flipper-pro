@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { parseHumanNumber } from "../utils/formatting";
 import "../styles/browse.css";
+
+const SAVED_PRESETS_KEY = "osrs-flipper-saved-filter-presets";
 
 const filterContainerStyle = {
     background: "#ffffff",
@@ -139,13 +141,82 @@ const clearButtonStyle = {
     transition: "all 0.2s",
 };
 
+const dialogOverlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10000,
+};
+
+const dialogStyle = {
+    background: '#ffffff',
+    borderRadius: '8px',
+    padding: '24px',
+    minWidth: '400px',
+    maxWidth: '500px',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+};
+
+const dialogInputStyle = {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '14px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    outline: 'none',
+    boxSizing: 'border-box',
+};
+
 export default function FilterBuilder({ visibleColumns, filters, onFilterChange, onClose, onClearFilters, isSearchFromSearchBar = false, onSearchFromSearchBarChange }) {
+    const [savedPresets, setSavedPresets] = useState(() => {
+        try {
+            const saved = localStorage.getItem(SAVED_PRESETS_KEY);
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+    const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [presetName, setPresetName] = useState("");
+    const [showLoadDialog, setShowLoadDialog] = useState(false);
+
     const filterGroups = visibleColumns.reduce((acc, col) => {
         (acc[col.category] = acc[col.category] || []).push(col);
         return acc;
     }, {});
 
     const now = Math.floor(Date.now() / 1000);
+
+    const handleSave = () => {
+        if (!presetName.trim()) {
+            alert("Please enter a name for your preset");
+            return;
+        }
+        const newPresets = [...savedPresets, { name: presetName.trim(), filters: filters, timestamp: Date.now() }];
+        setSavedPresets(newPresets);
+        localStorage.setItem(SAVED_PRESETS_KEY, JSON.stringify(newPresets));
+        setPresetName("");
+        setShowSaveDialog(false);
+    };
+
+    const handleLoad = (preset) => {
+        const loadEvent = new CustomEvent('importFilters', { detail: preset.filters });
+        window.dispatchEvent(loadEvent);
+        setShowLoadDialog(false);
+    };
+
+    const handleDelete = (index, e) => {
+        e.stopPropagation();
+        const newPresets = savedPresets.filter((_, i) => i !== index);
+        setSavedPresets(newPresets);
+        localStorage.setItem(SAVED_PRESETS_KEY, JSON.stringify(newPresets));
+    };
 
     // Helper function to get the filter key for a field
     const getFilterKey = (field, bound) => {
@@ -297,14 +368,102 @@ export default function FilterBuilder({ visibleColumns, filters, onFilterChange,
                     </div>
                 ))}
             </div>
+            {showSaveDialog && (
+                <div style={dialogOverlayStyle} onClick={() => setShowSaveDialog(false)}>
+                    <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>Save Filter Preset</h3>
+                        <input
+                            type="text"
+                            placeholder="Enter preset name..."
+                            value={presetName}
+                            onChange={(e) => setPresetName(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleSave()}
+                            style={dialogInputStyle}
+                            autoFocus
+                        />
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                            <button onClick={() => setShowSaveDialog(false)} style={clearButtonStyle}>Cancel</button>
+                            <button onClick={handleSave} style={doneButtonStyle}>Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showLoadDialog && (
+                <div style={dialogOverlayStyle} onClick={() => setShowLoadDialog(false)}>
+                    <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>Load Filter Preset</h3>
+                        {savedPresets.length === 0 ? (
+                            <p style={{ color: '#6b7280', margin: '16px 0' }}>No saved presets</p>
+                        ) : (
+                            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                {savedPresets.map((preset, index) => (
+                                    <div
+                                        key={index}
+                                        onClick={() => handleLoad(preset)}
+                                        style={{
+                                            padding: '12px',
+                                            marginBottom: '8px',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            transition: 'background-color 0.2s',
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        <span>{preset.name}</span>
+                                        <button
+                                            onClick={(e) => handleDelete(index, e)}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: '#ef4444',
+                                                cursor: 'pointer',
+                                                fontSize: '18px',
+                                                padding: '0 8px',
+                                            }}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                            <button onClick={() => setShowLoadDialog(false)} style={doneButtonStyle}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div style={filterFooterStyle}>
-                <button 
-                    onClick={onClearFilters} 
-                    style={clearButtonStyle} 
-                    className="filter-builder-clear"
-                >
-                    Clear Filters
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                        onClick={() => setShowSaveDialog(true)}
+                        style={clearButtonStyle}
+                        title="Save current filters"
+                    >
+                        Save
+                    </button>
+                    <button 
+                        onClick={() => setShowLoadDialog(true)}
+                        style={clearButtonStyle}
+                        title="Load saved filters"
+                    >
+                        Load
+                    </button>
+                    <button 
+                        onClick={onClearFilters} 
+                        style={clearButtonStyle} 
+                        className="filter-builder-clear"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
                 <button onClick={onClose} style={doneButtonStyle} className="column-picker-done">
                     Done
                 </button>

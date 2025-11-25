@@ -118,6 +118,22 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
         }
     }, [columnSettings]);
 
+    // Listen for import events from ColumnPicker and FilterBuilder
+    useEffect(() => {
+        const handleColumnImport = (event) => {
+            setColumnSettings(event.detail);
+        };
+        const handleFilterImport = (event) => {
+            setFilters(event.detail);
+        };
+        window.addEventListener('importColumnSettings', handleColumnImport);
+        window.addEventListener('importFilters', handleFilterImport);
+        return () => {
+            window.removeEventListener('importColumnSettings', handleColumnImport);
+            window.removeEventListener('importFilters', handleFilterImport);
+        };
+    }, []);
+
     // Toggle column visibility and drop any associated filters
     const toggleColumn = (id) => {
         const current = columnSettings.find((c) => c.id === id);
