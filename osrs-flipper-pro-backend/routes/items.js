@@ -10,6 +10,21 @@ router.get("/test", (req, res) => {
     res.json({ message: "Items router is working" });
 });
 
+// GET /api/items/all - Returns all items with id, name, and icon for search
+router.get("/all", async (req, res) => {
+    try {
+        const { rows } = await db.query(`
+            SELECT item_id AS id, name, icon
+            FROM canonical_items
+            ORDER BY name ASC
+        `);
+        res.json(rows);
+    } catch (err) {
+        console.error("[GET /items/all] Error:", err);
+        res.status(500).json({ error: "Database error", detail: err.message });
+    }
+});
+
 // GET /api/items/canonical/:id - Must be before other routes to avoid conflicts
 router.get("/canonical/:id", async (req, res) => {
     const itemId = parseInt(req.params.id, 10);
