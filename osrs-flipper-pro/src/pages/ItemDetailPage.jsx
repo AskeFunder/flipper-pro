@@ -332,18 +332,18 @@ export default function ItemDetailPage() {
         labels: filtered.map(p => new Date(p.ts * 1000)),
         datasets: [
             {
-                label: "Sell",
+                label: "Buy",
                 data: filtered.map(p => p.high),
-                borderColor: "red",
+                borderColor: "green",
                 tension: 0.1,
                 pointRadius: 0,
                 spanGaps: true,
                 yAxisID: 'y',
             },
             {
-                label: "Buy",
+                label: "Sell",
                 data: filtered.map(p => p.low),
-                borderColor: "green",
+                borderColor: "red",
                 tension: 0.1,
                 pointRadius: 0,
                 spanGaps: true,
@@ -440,76 +440,86 @@ export default function ItemDetailPage() {
                 </div>
             </div>
 
-            {/* Price Chart */}
+            {/* Price Chart and Recent Trades Side by Side */}
             <div style={sectionContainerStyle}>
-                <h2 style={sectionTitleStyle}>Price Chart</h2>
-                
-                {/* Time range buttons */}
-                <div style={{ marginBottom: 16 }}>
-                    {timeOptions.map(({ label }) => (
-                        <button
-                            key={label}
-                            onClick={() => setTimeRange(label)}
-                            style={{
-                                marginRight: 6,
-                                padding: '6px 10px',
-                                background: label === timeRange ? '#1e1e1e' : '#f0f0f0',
-                                color: label === timeRange ? '#fff' : '#000',
-                                borderRadius: 4,
-                                border: label === timeRange ? '2px solid #444' : '1px solid #ccc',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </div>
+                <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                    {/* Price Chart - 80% width */}
+                    <div style={{ flex: '0 0 80%', width: '80%' }}>
+                        <h2 style={sectionTitleStyle}>Price Chart</h2>
+                        
+                        {/* Time range buttons */}
+                        <div style={{ marginBottom: 16 }}>
+                            {timeOptions.map(({ label }) => (
+                                <button
+                                    key={label}
+                                    onClick={() => setTimeRange(label)}
+                                    style={{
+                                        marginRight: 6,
+                                        padding: '6px 10px',
+                                        background: label === timeRange ? '#1e1e1e' : '#f0f0f0',
+                                        color: label === timeRange ? '#fff' : '#000',
+                                        borderRadius: 4,
+                                        border: label === timeRange ? '2px solid #444' : '1px solid #ccc',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
 
-                {/* Chart */}
-                {filtered.length === 0 ? (
-                    <p>No price data available in selected range.</p>
-                ) : (
-                    <div style={{ height: '60vh', marginBottom: "32px" }}>
-                        <Line data={chartData} options={chartOptions} />
-                    </div>
-                )}
-            </div>
-
-            {/* Recent Trades */}
-            <div style={sectionContainerStyle}>
-                <h2 style={sectionTitleStyle}>Recent Trades</h2>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-                            <th align="left" style={{ padding: "12px", textAlign: "left" }}>Time</th>
-                            <th align="left" style={{ padding: "12px", textAlign: "left" }}>Type</th>
-                            <th align="left" style={{ padding: "12px", textAlign: "left" }}>Price</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {recentTrades.length === 0 ? (
-                            <tr>
-                                <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#6b7280" }}>
-                                    No recent trades available
-                                </td>
-                            </tr>
+                        {/* Chart */}
+                        {filtered.length === 0 ? (
+                            <p>No price data available in selected range.</p>
                         ) : (
-                            recentTrades.map((t, i) => {
-                                const isBuy = t.type === 'buy';
-                                const label = isBuy ? 'BUY' : 'SELL';
-                                const rowColor = isBuy ? '#eaffea' : '#ffeaea';
-                                const textColor = isBuy ? '#007a00' : '#b20000';
-                                return (
-                                    <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
-                                        <td style={{ padding: "10px 12px" }}>{new Date(t.ts * 1000).toLocaleTimeString()}</td>
-                                        <td style={{ padding: "10px 12px" }}>{label}</td>
-                                        <td style={{ padding: "10px 12px" }}>{t.price.toLocaleString()} gp</td>
-                                    </tr>
-                                );
-                            })
+                            <div style={{ height: '60vh' }}>
+                                <Line data={chartData} options={chartOptions} />
+                            </div>
                         )}
-                    </tbody>
-                </table>
+                    </div>
+
+                    {/* Recent Trades - 20% width */}
+                    <div style={{ flex: '0 0 20%', width: '20%' }}>
+                        <h2 style={sectionTitleStyle}>Recent Trades</h2>
+                        <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Time</th>
+                                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Type</th>
+                                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentTrades.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#6b7280" }}>
+                                                No recent trades available
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        recentTrades.map((t, i) => {
+                                            // Backend sends: 'sell' for high prices, 'buy' for low prices
+                                            // We want: high = Buy (green), low = Sell (red)
+                                            // So invert the logic
+                                            const isBuy = t.type === 'sell';
+                                            const label = isBuy ? 'BUY' : 'SELL';
+                                            const rowColor = isBuy ? '#eaffea' : '#ffeaea';
+                                            const textColor = isBuy ? '#007a00' : '#b20000';
+                                            return (
+                                                <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
+                                                    <td style={{ padding: "10px 12px" }}>{new Date(t.ts * 1000).toLocaleTimeString()}</td>
+                                                    <td style={{ padding: "10px 12px" }}>{label}</td>
+                                                    <td style={{ padding: "10px 12px" }}>{t.price.toLocaleString()} gp</td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* SECTION 1 — BASIC (LIVE MARKET DATA) */}
