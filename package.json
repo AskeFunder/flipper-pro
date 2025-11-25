@@ -1,0 +1,16 @@
+{
+  "name": "osrs-flipper-pro-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx concurrently --names \"API,SCHEDULER,FRONTEND\" --prefix-colors \"blue,green,yellow\" \"npm run dev:backend\" \"npm run dev:scheduler\" \"npm run dev:frontend\"",
+    "dev:backend": "cd osrs-flipper-pro-backend && npm start",
+    "dev:scheduler": "cd osrs-flipper-pro-backend && npm run scheduler",
+    "dev:frontend": "cd osrs-flipper-pro && npm start",
+    "install:all": "npm install && cd osrs-flipper-pro && npm install && cd ../osrs-flipper-pro-backend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+
