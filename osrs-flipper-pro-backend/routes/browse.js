@@ -64,6 +64,8 @@ router.get("/browse", async (req, res) => {
             maxMargin: "margin",
             minRoi: "roi_percent",
             maxRoi: "roi_percent",
+            minSpread: "spread_percent",
+            maxSpread: "spread_percent",
             minBuyPrice: "low",
             maxBuyPrice: "low",
             minSellPrice: "high",
