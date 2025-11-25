@@ -22,6 +22,7 @@ app.get('/', (_req, res) => {
 app.use('/api/items', require('./routes/items'));
 app.use('/api/items', require('./routes/browse')); // New fast browse endpoint
 app.use('/api/prices', require('./routes/prices'));
+app.use('/api/changelog', require('./routes/changelog'));
 
 // 🚀 Start server
 app.listen(PORT, () => {

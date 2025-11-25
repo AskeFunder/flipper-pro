@@ -20,6 +20,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import OathplateDashboard from "./components/OathplateDashboard";
 import BrowseItemsPage from "./pages/BrowseItemsPage";
 import ItemDetailPage from "./pages/ItemDetailPage";
+import ChangelogPage from "./pages/ChangelogPage";
 import SearchBar from "./components/SearchBar";
 import { nameToSlug } from "./utils/formatting";
 
@@ -210,7 +211,7 @@ function App() {
             <Route path="/live" element={<Typography>Day Trading Mode – coming soon.</Typography>} />
             <Route path="/favorites" element={<Typography>Favorites – coming soon.</Typography>} />
             <Route path="/settings" element={<Typography>Settings – coming soon.</Typography>} />
-            <Route path="/changelog" element={<Typography>Changelog – coming soon.</Typography>} />
+            <Route path="/changelog" element={<ChangelogPage />} />
           </Routes>
         </Box>
       </Box>
