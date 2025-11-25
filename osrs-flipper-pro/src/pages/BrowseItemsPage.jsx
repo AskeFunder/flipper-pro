@@ -146,6 +146,26 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                 </button>
             </div>
 
+            {/* Search Input */}
+            <div style={searchContainerStyle}>
+                <input
+                    type="text"
+                    placeholder="Search items by name..."
+                    value={searchQuery}
+                    onChange={(e) => onSearchQueryChange && onSearchQueryChange(e.target.value)}
+                    style={searchInputStyle}
+                />
+                {searchQuery && (
+                    <button
+                        onClick={() => onSearchQueryChange && onSearchQueryChange("")}
+                        style={clearSearchButtonStyle}
+                        title="Clear search"
+                    >
+                        ×
+                    </button>
+                )}
+            </div>
+
             {showColumnPicker && (
                 <ColumnPicker
                     columnSettings={columnSettings}
@@ -341,4 +361,36 @@ const actionButtonStyle = {
     borderRadius: "6px",
     cursor: "pointer",
     transition: "all 0.2s",
+};
+
+const searchContainerStyle = {
+    position: "relative",
+    marginBottom: "1.5rem",
+    maxWidth: "500px",
+};
+
+const searchInputStyle = {
+    width: "100%",
+    padding: "12px 40px 12px 16px",
+    fontSize: "14px",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    outline: "none",
+    transition: "all 0.2s",
+    fontFamily: "'Inter',sans-serif",
+};
+
+const clearSearchButtonStyle = {
+    position: "absolute",
+    right: "8px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    background: "transparent",
+    border: "none",
+    fontSize: "24px",
+    color: "#9ca3af",
+    cursor: "pointer",
+    padding: "0 8px",
+    lineHeight: "1",
+    transition: "color 0.2s",
 };

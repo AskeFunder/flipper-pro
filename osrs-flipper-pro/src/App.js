@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation, Routes, Route } from "react-router-dom";
 import {
   Drawer,
   List,
@@ -20,21 +21,48 @@ import OathplateDashboard from "./components/OathplateDashboard";
 import BrowseItemsPage from "./pages/BrowseItemsPage";
 import ItemDetailPage from "./pages/ItemDetailPage";
 import SearchBar from "./components/SearchBar";
+import { nameToSlug } from "./utils/formatting";
 
 
 const drawerWidth = 220;
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [page, setPage] = useState("browse");
-  const [selectedItemId, setSelectedItemId] = useState(null);
   const [browseSearchQuery, setBrowseSearchQuery] = useState("");
+  
+  // Extract item ID/name from URL path
+  // Format: /item/4151-abyssal-whip or /item/abyssal-whip (backward compatible)
+  const pathParts = location.pathname.split('/');
+  const itemParam = pathParts[1] === 'item' && pathParts[2] ? pathParts[2] : null;
+  const selectedItemName = itemParam ? (itemParam.includes('-') && /^\d+-/.test(itemParam) ? itemParam.split('-').slice(1).join('-') : itemParam) : null;
+
+  // Update page state based on URL
+  useEffect(() => {
+    if (selectedItemName) {
+      setPage("browse"); // Keep page as browse when viewing item details
+    } else if (location.pathname === "/" || location.pathname === "/browse") {
+      setPage("browse");
+    } else {
+      const pageFromPath = location.pathname.slice(1); // Remove leading slash
+      setPage(pageFromPath || "browse");
+    }
+  }, [location.pathname, selectedItemName]);
 
   // Clear search query when navigating away from browse page
   useEffect(() => {
-    if (page !== "browse") {
+    if (page !== "browse" || selectedItemName) {
       setBrowseSearchQuery("");
     }
-  }, [page]);
+  }, [page, selectedItemName]);
+  
+  // Handler for item click - navigate to item detail page using item ID + name slug
+  // Format: /item/4151-abyssal-whip (hybrid approach for reliability)
+  const handleItemClick = (itemId, itemName) => {
+    const slug = nameToSlug(itemName);
+    navigate(`/item/${itemId}-${encodeURIComponent(slug)}`);
+  };
 
   const navItems = [
     { id: "dashboard", label: "Oathplate Dashboard", icon: <DashboardIcon /> },
@@ -72,10 +100,9 @@ function App() {
           {navItems.map((item) => (
             <ListItemButton
               key={item.id}
-              selected={page === item.id && !selectedItemId}
+              selected={page === item.id && !selectedItemName}
               onClick={() => {
-                setSelectedItemId(null); // Clear item detail view
-                setPage(item.id);         // Navigate to new page
+                navigate(`/${item.id === "browse" ? "" : item.id}`);
               }}
               disableRipple
               disableTouchRipple
@@ -111,7 +138,7 @@ function App() {
         }}
       >
         {/* Search Bar - Floating in top right corner, no layout impact */}
-        {(page === "browse" || selectedItemId) && (
+        {(page === "browse" || selectedItemName) && (
           <Box
             sx={{
               position: "absolute",
@@ -125,8 +152,14 @@ function App() {
             }}
           >
             <SearchBar
-              onItemClick={(itemId) => setSelectedItemId(itemId)}
-              onSearch={(query) => setBrowseSearchQuery(query)}
+              onItemClick={handleItemClick}
+              onSearch={(query) => {
+                setBrowseSearchQuery(query);
+                // Navigate to browse page if not already there
+                if (page !== "browse" || selectedItemName) {
+                  navigate("/browse");
+                }
+              }}
             />
           </Box>
         )}
@@ -139,28 +172,29 @@ function App() {
             overflowY: "auto",
           }}
         >
-          {selectedItemId ? (
-            <ItemDetailPage 
-              itemId={selectedItemId} 
-              onBack={() => setSelectedItemId(null)} 
-            />
-          ) : (
-            <>
-          {page === "dashboard" && <OathplateDashboard />}
-              {page === "browse" && (
-                <BrowseItemsPage 
-                  onItemClick={setSelectedItemId}
-                  searchQuery={browseSearchQuery}
-                  onSearchQueryChange={setBrowseSearchQuery}
-                />
-              )}
-          {page === "methods" && <Typography>Method Calculators – coming soon.</Typography>}
-          {page === "live" && <Typography>Day Trading Mode – coming soon.</Typography>}
-          {page === "favorites" && <Typography>Favorites – coming soon.</Typography>}
-          {page === "settings" && <Typography>Settings – coming soon.</Typography>}
-          {page === "changelog" && <Typography>Changelog – coming soon.</Typography>}
-            </>
-          )}
+          <Routes>
+            <Route path="/item/:itemId" element={<ItemDetailPage />} />
+            <Route path="/dashboard" element={<OathplateDashboard />} />
+            <Route path="/browse" element={
+              <BrowseItemsPage 
+                onItemClick={handleItemClick}
+                searchQuery={browseSearchQuery}
+                onSearchQueryChange={setBrowseSearchQuery}
+              />
+            } />
+            <Route path="/" element={
+              <BrowseItemsPage 
+                onItemClick={handleItemClick}
+                searchQuery={browseSearchQuery}
+                onSearchQueryChange={setBrowseSearchQuery}
+              />
+            } />
+            <Route path="/methods" element={<Typography>Method Calculators – coming soon.</Typography>} />
+            <Route path="/live" element={<Typography>Day Trading Mode – coming soon.</Typography>} />
+            <Route path="/favorites" element={<Typography>Favorites – coming soon.</Typography>} />
+            <Route path="/settings" element={<Typography>Settings – coming soon.</Typography>} />
+            <Route path="/changelog" element={<Typography>Changelog – coming soon.</Typography>} />
+          </Routes>
         </Box>
       </Box>
     </Box>

@@ -105,7 +105,7 @@ export default function SearchBar({ onItemClick, onSearch }) {
 
     const handleItemClick = (item) => {
         if (onItemClick) {
-            onItemClick(item.id);
+            onItemClick(item.id, item.name);
         }
         setQuery("");
         setResults([]);

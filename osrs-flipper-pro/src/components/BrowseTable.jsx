@@ -104,7 +104,7 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                             <tr 
                                 key={item.id} 
                                 style={rowStyle}
-                                onClick={() => onItemClick && onItemClick(item.id)}
+                                onClick={() => onItemClick && onItemClick(item.id, item.name)}
                                 className="browse-table-row"
                             >
                             <td style={tdStyle}>

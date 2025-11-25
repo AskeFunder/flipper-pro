@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import {
     Chart as ChartJS,
@@ -17,6 +18,7 @@ import {
     formatColoredNumber,
     formatRoi,
     timeAgo,
+    slugToName,
 } from "../utils/formatting";
 import CanonicalDataDisplay from "../components/CanonicalDataDisplay";
 
@@ -45,25 +47,46 @@ const timeOptions = [
 
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
-export default function ItemDetailPage({ itemId, onBack }) {
+export default function ItemDetailPage() {
+    const { itemId } = useParams();
+    // itemId can be either:
+    // 1. "4151-abyssal-whip" (ID-slug format - preferred)
+    // 2. "abyssal-whip" (slug only - backward compatible)
+    let numericItemId = null;
+    let itemNameSlug = null;
+    
+    if (itemId) {
+        const decoded = decodeURIComponent(itemId);
+        // Check if it starts with a number (ID-slug format)
+        const match = decoded.match(/^(\d+)-(.+)$/);
+        if (match) {
+            numericItemId = parseInt(match[1], 10);
+            itemNameSlug = match[2];
+        } else {
+            // Backward compatible: slug only
+            itemNameSlug = decoded;
+        }
+    }
     const [priceData, setPriceData] = useState([]);
     const [canonicalData, setCanonicalData] = useState(null);
     const [recentTrades, setRecentTrades] = useState([]);
     const [timeRange, setTimeRange] = useState('12H');
     const [loading, setLoading] = useState(true);
 
-    console.log("ItemDetailPage rendered with itemId:", itemId);
+    console.log("ItemDetailPage rendered with item slug:", itemNameSlug);
 
     const selected = timeOptions.find(o => o.label === timeRange);
     const granularity = selected ? selected.granularity : '5m';
 
-    // Fetch canonical data
+    // Fetch canonical data by ID (preferred) or name
     useEffect(() => {
-        if (!itemId) return;
+        if (!numericItemId && !itemNameSlug) return;
 
         const fetchCanonical = async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/items/canonical/${itemId}`);
+                // Prefer ID lookup if available (more reliable)
+                const apiParam = numericItemId ? numericItemId : encodeURIComponent(itemNameSlug);
+                const res = await fetch(`${API_BASE}/api/items/canonical/${apiParam}`);
                 if (res.ok) {
                     const data = await res.json();
                     setCanonicalData(data);
@@ -79,14 +102,14 @@ export default function ItemDetailPage({ itemId, onBack }) {
         };
 
         fetchCanonical();
-    }, [itemId]);
+    }, [numericItemId, itemNameSlug]);
 
     // Fetch chart data
     useEffect(() => {
-        if (!itemId) return;
+        if (!canonicalData || !canonicalData.item_id) return;
 
         const fetchChart = () => {
-            fetch(`${API_BASE}/api/prices/chart/${granularity}/${itemId}`)
+            fetch(`${API_BASE}/api/prices/chart/${granularity}/${canonicalData.item_id}`)
                 .then(res => res.json())
                 .then(setPriceData)
                 .catch(console.error);
@@ -95,14 +118,14 @@ export default function ItemDetailPage({ itemId, onBack }) {
         fetchChart();
         const int = setInterval(fetchChart, 15000);
         return () => clearInterval(int);
-    }, [itemId, granularity, timeRange]);
+    }, [canonicalData, granularity, timeRange]);
 
     // Fetch recent trades
     useEffect(() => {
-        if (!itemId) return;
+        if (!canonicalData || !canonicalData.item_id) return;
 
         const fetchRecent = () => {
-            fetch(`${API_BASE}/api/prices/recent/${itemId}`)
+            fetch(`${API_BASE}/api/prices/recent/${canonicalData.item_id}`)
                 .then(res => res.json())
                 .then(setRecentTrades)
                 .catch(console.error);
@@ -111,7 +134,7 @@ export default function ItemDetailPage({ itemId, onBack }) {
         fetchRecent();
         const int = setInterval(fetchRecent, 15000);
         return () => clearInterval(int);
-    }, [itemId]);
+    }, [canonicalData]);
 
     const now = Date.now();
     const minTime = selected ? now - selected.ms : 0;
@@ -201,7 +224,6 @@ export default function ItemDetailPage({ itemId, onBack }) {
     if (!canonicalData) {
         return (
             <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
-                <button onClick={onBack} style={backButtonStyle}>← Back to Browse</button>
                 <p>Item not found</p>
             </div>
         );
@@ -212,8 +234,6 @@ export default function ItemDetailPage({ itemId, onBack }) {
 
     return (
         <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
-            <button onClick={onBack} style={backButtonStyle}>← Back to Browse</button>
-
             <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
                 <img
                     src={`${baseIconURL}/${safe}/64px-${safe}`}
@@ -296,17 +316,4 @@ export default function ItemDetailPage({ itemId, onBack }) {
         </div>
     );
 }
-
-const backButtonStyle = {
-    padding: "10px 20px",
-    fontSize: "14px",
-    fontWeight: 500,
-    color: "#374151",
-    background: "#ffffff",
-    border: "1px solid #d1d5db",
-    borderRadius: "6px",
-    cursor: "pointer",
-    marginBottom: "24px",
-    transition: "all 0.2s",
-};
 

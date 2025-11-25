@@ -121,3 +121,25 @@ export function parseHumanNumber(input) {
     const num = parseFloat(str);
     return isNaN(num) ? null : num;
 }
+
+// Convert item name to URL-friendly slug
+export function nameToSlug(name) {
+    if (!name) return '';
+    return name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-')      // Replace spaces with hyphens
+        .replace(/-+/g, '-')        // Replace multiple hyphens with single
+        .replace(/^-|-$/g, '');    // Remove leading/trailing hyphens
+}
+
+// Convert URL slug back to item name (approximate - for display purposes)
+export function slugToName(slug) {
+    if (!slug) return '';
+    return decodeURIComponent(slug)
+        .replace(/-/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}

@@ -31,8 +31,118 @@ router.get("/canonical/:id", async (req, res) => {
     console.log(`[GET /items/canonical/${itemId}] Request received`);
     
     if (isNaN(itemId)) {
-        console.log(`[GET /items/canonical/${req.params.id}] Invalid item ID`);
-        return res.status(400).json({ error: "Invalid item ID" });
+        // If not a number, try to fetch by name (slug format: hyphens instead of spaces)
+        const itemNameSlug = decodeURIComponent(req.params.id);
+        console.log(`[GET /items/canonical/${req.params.id}] Trying to fetch by name slug: "${itemNameSlug}"`);
+        
+        try {
+            // Normalize function: remove special characters and convert to lowercase for comparison
+            // This matches what the frontend nameToSlug function does
+            const normalize = (str) => {
+                return str
+                    .toLowerCase()
+                    .replace(/[^\w\s-]/g, '') // Remove special characters (like parentheses)
+                    .replace(/\s+/g, ' ')   // Normalize spaces
+                    .trim();
+            };
+            
+            // Convert slug back to name: replace hyphens with spaces
+            const itemName = itemNameSlug.replace(/-/g, ' ');
+            const normalizedSearch = normalize(itemName);
+            
+            // Strategy 1: Try exact match first (case-insensitive, trimmed)
+            let { rows } = await db.query(`
+                SELECT * FROM canonical_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+            `, [itemName]);
+
+            console.log(`[GET /items/canonical/${req.params.id}] Exact match found ${rows.length} rows`);
+
+            // Strategy 2: If no exact match, try normalized comparison (removes special characters from both sides)
+            if (rows.length === 0) {
+                const { rows: normalizedRows } = await db.query(`
+                    SELECT *, 
+                           LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g')) AS normalized_name
+                    FROM canonical_items
+                    WHERE LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g')) = $1
+                `, [normalizedSearch]);
+                
+                console.log(`[GET /items/canonical/${req.params.id}] Normalized match found ${normalizedRows.length} rows`);
+                rows = normalizedRows;
+            }
+
+            // Strategy 3: If multiple results or no results, try fuzzy matching
+            // This handles cases where multiple items have the same normalized name (e.g., poison variants)
+            if (rows.length === 0 || rows.length > 1) {
+                // For fuzzy matching, we need to handle the case where the slug might match multiple items
+                // We'll search for items where the normalized name contains all words from the search term
+                const searchWords = normalizedSearch.split(/\s+/).filter(w => w.length > 0);
+                
+                if (searchWords.length > 0) {
+                    // Build a query that finds items containing all search words
+                    const wordConditions = searchWords.map((word, idx) => 
+                        `LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g')) LIKE '%' || $${idx + 1} || '%'`
+                    ).join(' AND ');
+                    
+                    const { rows: fuzzyRows } = await db.query(`
+                        SELECT *,
+                               LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g')) AS normalized_name,
+                               -- Calculate word match score
+                               (
+                                   SELECT COUNT(*) 
+                                   FROM unnest(string_to_array($${searchWords.length + 1}, ' ')) AS search_word
+                                   WHERE LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g')) LIKE '%' || search_word || '%'
+                               ) AS word_matches,
+                               -- Calculate character similarity (Levenshtein-like using length difference)
+                               ABS(LENGTH(LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g'))) - LENGTH($${searchWords.length + 1})) AS length_diff
+                        FROM canonical_items
+                        WHERE ${wordConditions}
+                        ORDER BY 
+                            -- Prefer exact normalized match
+                            CASE WHEN LOWER(REGEXP_REPLACE(name, '[^\\w\\s-]', '', 'g')) = $${searchWords.length + 1} THEN 1 ELSE 2 END,
+                            -- Then by number of word matches (descending)
+                            word_matches DESC,
+                            -- Then by length difference (closer is better)
+                            length_diff ASC,
+                            -- Then by name length (shorter is usually better match)
+                            LENGTH(name) ASC
+                        LIMIT 10
+                    `, [...searchWords, normalizedSearch]);
+                    
+                    if (fuzzyRows.length > 0) {
+                        console.log(`[GET /items/canonical/${req.params.id}] Fuzzy match found ${fuzzyRows.length} rows, using best match`);
+                        rows = [fuzzyRows[0]]; // Use the best match
+                    }
+                }
+            }
+
+            // Strategy 4: If still no match, try LIKE search with original name
+            if (rows.length === 0) {
+                const searchPattern = `%${itemName}%`;
+                const { rows: likeRows } = await db.query(`
+                    SELECT * FROM canonical_items WHERE LOWER(name) LIKE LOWER($1)
+                    ORDER BY CASE WHEN LOWER(name) = LOWER($2) THEN 1 ELSE 2 END
+                    LIMIT 1
+                `, [searchPattern, itemName]);
+                
+                console.log(`[GET /items/canonical/${req.params.id}] LIKE search found ${likeRows.length} rows`);
+                rows = likeRows;
+            }
+
+            if (rows.length === 0) {
+                console.log(`[GET /items/canonical/${req.params.id}] No item found for slug: "${itemNameSlug}"`);
+                return res.status(404).json({ error: "Item not found" });
+            }
+
+            // If we have multiple results, log a warning but return the first (best match)
+            if (rows.length > 1) {
+                console.warn(`[GET /items/canonical/${req.params.id}] Multiple matches found (${rows.length}), returning best match`);
+            }
+
+            return res.json(rows[0]);
+        } catch (err) {
+            console.error(`[GET /items/canonical/${req.params.id}] Error:`, err);
+            return res.status(500).json({ error: "Database error", detail: err.message });
+        }
     }
 
     try {
