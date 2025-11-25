@@ -4,6 +4,8 @@ import {
     Chart as ChartJS,
     LineElement,
     PointElement,
+    BarElement,
+    BarController,
     LinearScale,
     CategoryScale,
     TimeScale,
@@ -15,6 +17,8 @@ import 'chartjs-adapter-date-fns';
 ChartJS.register(
     LineElement,
     PointElement,
+    BarElement,
+    BarController,
     LinearScale,
     CategoryScale,
     TimeScale,
@@ -157,8 +161,57 @@ export default function OathplateDashboard() {
     const priceRange = maxPrice - minPrice;
     const paddingAmount = priceRange > 0 ? priceRange * 0.2 : maxPrice * 0.1; // 20% padding, or 10% of max if range is 0
     
-    const yMin = Math.max(0, minPrice - paddingAmount);
-    const yMax = hasSpike ? maxPrice : maxPrice + paddingAmount; // Only bottom padding if spike
+    // Helper function to find a "nice" step size for tick marks
+    const getNiceStep = (range) => {
+        if (range <= 0) return 1;
+        
+        // Calculate rough step size (aim for ~5-10 ticks)
+        const roughStep = range / 8;
+        
+        // Find the order of magnitude
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        
+        // Normalize to 1-10 range
+        const normalized = roughStep / magnitude;
+        
+        // Choose a nice step: 1, 2, 5, or 10 times the magnitude
+        let niceNormalized;
+        if (normalized <= 1) niceNormalized = 1;
+        else if (normalized <= 2) niceNormalized = 2;
+        else if (normalized <= 5) niceNormalized = 5;
+        else niceNormalized = 10;
+        
+        return niceNormalized * magnitude;
+    };
+    
+    // Helper function to round to nearest nice tick
+    const roundToNiceTick = (value, step, roundDown = true) => {
+        if (value <= 0) return 0;
+        if (roundDown) {
+            return Math.floor(value / step) * step;
+        } else {
+            return Math.ceil(value / step) * step;
+        }
+    };
+    
+    // Calculate minimum padding values
+    const minPaddingBottom = minPrice - paddingAmount;
+    const minPaddingTop = hasSpike ? maxPrice : maxPrice + paddingAmount;
+    
+    // Determine nice step size based on the padded range
+    const paddedRange = minPaddingTop - minPaddingBottom;
+    const niceStep = getNiceStep(paddedRange);
+    
+    // Round to nice ticks (down for bottom, up for top)
+    const yMin = Math.max(0, roundToNiceTick(minPaddingBottom, niceStep, true));
+    const yMax = roundToNiceTick(minPaddingTop, niceStep, false);
+
+    // Calculate volume data and scale for bottom 20% of graph
+    const volumes = filtered.map(p => p.volume || 0).filter(v => v > 0);
+    const maxVolume = volumes.length > 0 ? Math.max(...volumes) : 1;
+    const priceRangeForVolume = yMax - yMin;
+    const volumeBottom = yMin;
+    const volumeTop = yMin + priceRangeForVolume * 0.2; // Bottom 20% of price range
 
     const chartData = {
         labels: filtered.map(p => new Date(p.ts * 1000)),
@@ -170,6 +223,7 @@ export default function OathplateDashboard() {
                 tension: 0.1,
                 pointRadius: 0,
                 spanGaps: true,
+                yAxisID: 'y',
             },
             {
                 label: "Buy",
@@ -178,6 +232,24 @@ export default function OathplateDashboard() {
                 tension: 0.1,
                 pointRadius: 0,
                 spanGaps: true,
+                yAxisID: 'y',
+            },
+            {
+                label: "Volume",
+                data: filtered.map((p) => {
+                    const vol = p.volume || 0;
+                    // Map volume to bottom 20% of price range
+                    if (vol > 0) {
+                        const scaledY = volumeBottom + (vol / maxVolume) * (volumeTop - volumeBottom);
+                        return { x: p.ts * 1000, y: scaledY, rawVolume: vol };
+                    }
+                    return null;
+                }).filter(d => d !== null),
+                type: 'bar',
+                backgroundColor: 'rgba(100, 100, 255, 0.3)',
+                borderColor: 'rgba(100, 100, 255, 0.5)',
+                borderWidth: 1,
+                yAxisID: 'y',
             }
         ]
     };
@@ -189,7 +261,21 @@ export default function OathplateDashboard() {
         plugins: {
             tooltip: {
                 callbacks: {
-                    title: items => new Date(items[0].parsed.x).toLocaleString()
+                    title: items => new Date(items[0].parsed.x).toLocaleString(),
+                    label: function(context) {
+                        const dataset = context.dataset;
+                        if (dataset.label === 'Volume') {
+                            const rawVolume = context.raw?.rawVolume;
+                            if (rawVolume) {
+                                // Show actual volume value
+                                if (rawVolume >= 1000000) return `Volume: ${(rawVolume / 1000000).toFixed(1)}M`;
+                                if (rawVolume >= 1000) return `Volume: ${(rawVolume / 1000).toFixed(1)}K`;
+                                return `Volume: ${rawVolume.toLocaleString()}`;
+                            }
+                            return `Volume: ${context.parsed.y.toLocaleString()}`;
+                        }
+                        return `${dataset.label}: ${context.parsed.y.toLocaleString()} gp`;
+                    }
                 }
             }
         },
@@ -209,7 +295,10 @@ export default function OathplateDashboard() {
             y: { 
                 title: { display: true, text: 'Price (gp)' },
                 min: yMin,
-                max: yMax
+                max: yMax,
+                ticks: {
+                    stepSize: niceStep
+                }
             }
         }
     };
