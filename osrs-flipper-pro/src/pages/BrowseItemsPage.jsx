@@ -15,16 +15,50 @@ import FilterBuilder from "../components/FilterBuilder";
 import { allColumns } from "../constants/column";
 
 const API_URL = "http://localhost:3001/api/items/browse";
+const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
+const COLUMN_SETTINGS_STORAGE_KEY = "osrs-flipper-column-settings";
 
-export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearchQueryChange }) {
+export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearchQueryChange, isSearchFromSearchBar = false, onSearchFromSearchBarChange }) {
     const [items, setItems] = useState([]);
     const [sortBy, setSortBy] = useState("margin");
     const [order, setOrder] = useState("desc");
     const [loading, setLoading] = useState(false);
-    const [columnSettings, setColumnSettings] = useState(allColumns);
+    
+    // Load column settings from localStorage on mount
+    const [columnSettings, setColumnSettings] = useState(() => {
+        try {
+            const saved = localStorage.getItem(COLUMN_SETTINGS_STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Merge with allColumns to ensure we have all columns, even if new ones were added
+                const merged = allColumns.map(col => {
+                    const savedCol = parsed.find(c => c.id === col.id);
+                    return savedCol ? { ...col, visible: savedCol.visible } : col;
+                });
+                return merged;
+            }
+        } catch (e) {
+            console.error("Failed to load column settings from localStorage:", e);
+        }
+        return allColumns;
+    });
+    
     const [showColumnPicker, setShowColumnPicker] = useState(false);
     const [showFilterBuilder, setShowFilterBuilder] = useState(false);
-    const [filters, setFilters] = useState({});
+    
+    // Load filters from localStorage on mount
+    const [filters, setFilters] = useState(() => {
+        try {
+            const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error("Failed to load filters from localStorage:", e);
+        }
+        return {};
+    });
+    
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalRows, setTotalRows] = useState(0);
@@ -45,13 +79,15 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
         setLoading(true);
 
         // New endpoint doesn't need columns param - it returns all columns
+        // If search came from searchbar, ignore filters (filterless search)
         const q = new URLSearchParams({
             page: currentPage,
             pageSize: 50,
             sortBy,
             order,
             search: searchQuery,
-            ...filters,
+            // Only include filters if search did NOT come from searchbar
+            ...(isSearchFromSearchBar ? {} : filters),
         });
 
         fetch(`${API_URL}?${q.toString()}`, { signal: controller.signal })
@@ -71,7 +107,16 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
             });
 
         return () => controller.abort();
-    }, [searchQuery, sortBy, order, filters, columnSettings, currentPage]);
+    }, [searchQuery, sortBy, order, filters, columnSettings, currentPage, isSearchFromSearchBar]);
+
+    // Save column settings to localStorage whenever they change
+    useEffect(() => {
+        try {
+            localStorage.setItem(COLUMN_SETTINGS_STORAGE_KEY, JSON.stringify(columnSettings));
+        } catch (e) {
+            console.error("Failed to save column settings to localStorage:", e);
+        }
+    }, [columnSettings]);
 
     // Toggle column visibility and drop any associated filters
     const toggleColumn = (id) => {
@@ -105,6 +150,25 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
         }
     };
 
+    // Save filters to localStorage whenever they change
+    useEffect(() => {
+        try {
+            localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
+        } catch (e) {
+            console.error("Failed to save filters to localStorage:", e);
+        }
+    }, [filters]);
+
+    // Reset columns to default visibility
+    const resetColumnsToDefaults = () => {
+        setColumnSettings(allColumns.map(col => ({ ...col })));
+    };
+
+    // Clear all filters
+    const clearAllFilters = () => {
+        setFilters({});
+    };
+
     // Handle filter changes
     const handleFilterChange = (field, value) => {
         const key = normalizeField(field);
@@ -114,11 +178,16 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
             else next[key] = value;
             return next;
         });
+        // When filters are changed, enable them (disable search-from-searchbar mode)
+        if (isSearchFromSearchBar && onSearchFromSearchBarChange) {
+            onSearchFromSearchBarChange(false);
+        }
         // Reset to page 1 when filters change
         setCurrentPage(1);
     };
 
     // Reset to page 1 when search or sort changes
+    // Note: Filters are preserved via localStorage and are NOT cleared when searchQuery changes
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery, sortBy, order]);
@@ -126,19 +195,41 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
     const visible = columnSettings.filter((c) => c.visible);
 
     return (
-        <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
+        <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif", width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box" }}>
             <h2>Browse Items</h2>
 
             <div style={actionButtonsStyle}>
                 <button 
-                    onClick={() => setShowColumnPicker(true)} 
+                    onClick={() => {
+                        if (showColumnPicker) {
+                            // If already open, close it
+                            setShowColumnPicker(false);
+                        } else {
+                            // Close filter builder if open, then open column picker
+                            if (showFilterBuilder) {
+                                setShowFilterBuilder(false);
+                            }
+                            setShowColumnPicker(true);
+                        }
+                    }} 
                     style={actionButtonStyle}
                     className="action-button"
                 >
                     Add Columns
                 </button>
                 <button 
-                    onClick={() => setShowFilterBuilder(true)} 
+                    onClick={() => {
+                        if (showFilterBuilder) {
+                            // If already open, close it
+                            setShowFilterBuilder(false);
+                        } else {
+                            // Close column picker if open, then open filter builder
+                            if (showColumnPicker) {
+                                setShowColumnPicker(false);
+                            }
+                            setShowFilterBuilder(true);
+                        }
+                    }} 
                     style={actionButtonStyle}
                     className="action-button"
                 >
@@ -146,31 +237,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                 </button>
             </div>
 
-            {/* Search Input */}
-            <div style={searchContainerStyle}>
-                <input
-                    type="text"
-                    placeholder="Search items by name..."
-                    value={searchQuery}
-                    onChange={(e) => onSearchQueryChange && onSearchQueryChange(e.target.value)}
-                    style={searchInputStyle}
-                />
-                {searchQuery && (
-                    <button
-                        onClick={() => onSearchQueryChange && onSearchQueryChange("")}
-                        style={clearSearchButtonStyle}
-                        title="Clear search"
-                    >
-                        ×
-                    </button>
-                )}
-            </div>
-
             {showColumnPicker && (
                 <ColumnPicker
                     columnSettings={columnSettings}
                     onToggleColumn={toggleColumn}
                     onClose={() => setShowColumnPicker(false)}
+                    onResetToDefaults={resetColumnsToDefaults}
                 />
             )}
 
@@ -180,8 +252,47 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                     filters={filters}
                     onFilterChange={handleFilterChange}
                     onClose={() => setShowFilterBuilder(false)}
+                    onClearFilters={clearAllFilters}
+                    isSearchFromSearchBar={isSearchFromSearchBar}
+                    onSearchFromSearchBarChange={onSearchFromSearchBarChange}
                 />
             )}
+
+            {/* Search Input */}
+            <div style={searchContainerStyle}>
+                <input
+                    type="text"
+                    placeholder="Search items by name..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                        if (onSearchQueryChange) {
+                            onSearchQueryChange(e.target.value);
+                        }
+                        // When user types in browse search, it's not from searchbar anymore
+                        if (isSearchFromSearchBar && onSearchFromSearchBarChange) {
+                            onSearchFromSearchBarChange(false);
+                        }
+                    }}
+                    style={searchInputStyle}
+                />
+                {searchQuery && (
+                    <button
+                        onClick={() => {
+                            if (onSearchQueryChange) {
+                                onSearchQueryChange("");
+                            }
+                            // Clear search-from-searchbar flag when clearing search
+                            if (onSearchFromSearchBarChange) {
+                                onSearchFromSearchBarChange(false);
+                            }
+                        }}
+                        style={clearSearchButtonStyle}
+                        title="Clear search"
+                    >
+                        ×
+                    </button>
+                )}
+            </div>
 
             <BrowseTable
                 items={items}

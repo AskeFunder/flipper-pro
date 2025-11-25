@@ -176,8 +176,12 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
 
 const scrollContainerStyle = {
     width: "100%",
+    maxWidth: "100%",
     overflowX: "auto",
     overflowY: "visible",
+    position: "relative",
+    WebkitOverflowScrolling: "touch", // Smooth scrolling on iOS
+    boxSizing: "border-box",
 };
 
 const tableStyle = {
@@ -185,6 +189,8 @@ const tableStyle = {
     tableLayout: "auto",
     width: "max-content",
     minWidth: "100%",
+    margin: 0,
+    display: "table",
 };
 
 const headerRowStyle = {

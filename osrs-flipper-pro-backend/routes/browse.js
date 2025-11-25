@@ -111,7 +111,11 @@ router.get("/browse", async (req, res) => {
             minMax_profit: "max_profit",
             maxMax_profit: "max_profit",
             minMax_investment: "max_investment",
-            maxMax_investment: "max_investment"
+            maxMax_investment: "max_investment",
+            minBuyTime: "low_timestamp",
+            maxBuyTime: "low_timestamp",
+            minSellTime: "high_timestamp",
+            maxSellTime: "high_timestamp"
         };
 
         for (const [queryKey, dbColumn] of Object.entries(filterMap)) {

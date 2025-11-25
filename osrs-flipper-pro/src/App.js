@@ -31,6 +31,7 @@ function App() {
   const location = useLocation();
   const [page, setPage] = useState("browse");
   const [browseSearchQuery, setBrowseSearchQuery] = useState("");
+  const [isSearchFromSearchBar, setIsSearchFromSearchBar] = useState(false);
   
   // Extract item ID/name from URL path
   // Format: /item/4151-abyssal-whip or /item/abyssal-whip (backward compatible)
@@ -75,7 +76,7 @@ function App() {
   ];
 
   return (
-    <Box sx={{ display: "flex", height: "100vh" }}>
+    <Box sx={{ display: "flex", height: "100vh", width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
       {/* Sidebar */}
       <Drawer
         variant="permanent"
@@ -102,6 +103,11 @@ function App() {
               key={item.id}
               selected={page === item.id && !selectedItemName}
               onClick={() => {
+                if (item.id === "browse") {
+                  // When clicking Browse Items, clear search-from-searchbar flag to restore filters
+                  setIsSearchFromSearchBar(false);
+                  setBrowseSearchQuery(""); // Clear search query when navigating to browse
+                }
                 navigate(`/${item.id === "browse" ? "" : item.id}`);
               }}
               disableRipple
@@ -135,6 +141,9 @@ function App() {
           flexDirection: "column",
           height: "100vh",
           position: "relative",
+          overflowX: "hidden",
+          width: "100%",
+          maxWidth: "100%",
         }}
       >
         {/* Search Bar - Floating in top right corner, no layout impact */}
@@ -155,6 +164,7 @@ function App() {
               onItemClick={handleItemClick}
               onSearch={(query) => {
                 setBrowseSearchQuery(query);
+                setIsSearchFromSearchBar(true); // Mark that search came from searchbar (filterless)
                 // Navigate to browse page if not already there
                 if (page !== "browse" || selectedItemName) {
                   navigate("/browse");
@@ -170,6 +180,9 @@ function App() {
             flexGrow: 1,
             p: 3,
             overflowY: "auto",
+            overflowX: "hidden",
+            width: "100%",
+            maxWidth: "100%",
           }}
         >
           <Routes>
@@ -180,6 +193,8 @@ function App() {
                 onItemClick={handleItemClick}
                 searchQuery={browseSearchQuery}
                 onSearchQueryChange={setBrowseSearchQuery}
+                isSearchFromSearchBar={isSearchFromSearchBar}
+                onSearchFromSearchBarChange={setIsSearchFromSearchBar}
               />
             } />
             <Route path="/" element={
@@ -187,6 +202,8 @@ function App() {
                 onItemClick={handleItemClick}
                 searchQuery={browseSearchQuery}
                 onSearchQueryChange={setBrowseSearchQuery}
+                isSearchFromSearchBar={isSearchFromSearchBar}
+                onSearchFromSearchBarChange={setIsSearchFromSearchBar}
               />
             } />
             <Route path="/methods" element={<Typography>Method Calculators – coming soon.</Typography>} />

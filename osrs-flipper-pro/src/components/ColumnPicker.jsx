@@ -121,7 +121,9 @@ const pickerFooterStyle = {
     borderTop: "1px solid #e5e7eb",
     background: "#f9fafb",
     display: "flex",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
 };
 
 const doneButtonStyle = {
@@ -136,6 +138,18 @@ const doneButtonStyle = {
     transition: "all 0.2s",
 };
 
+const defaultButtonStyle = {
+    padding: "10px 24px",
+    fontSize: "14px",
+    fontWeight: 500,
+    color: "#374151",
+    background: "#ffffff",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    cursor: "pointer",
+    transition: "all 0.2s",
+};
+
 const categoryDescriptions = {
     "Core": "Essential price and profit metrics: buy/sell prices, margin, ROI, and spread percentages.",
     "Limit": "Trading limit information: maximum items you can buy/sell and related calculations.",
@@ -145,7 +159,7 @@ const categoryDescriptions = {
     "Buy/Sell Ratio": "Ratio of sell volume to buy volume. >1 = more sellers, <1 = more buyers. Helps gauge demand."
 };
 
-export default function ColumnPicker({ columnSettings, onToggleColumn, onClose }) {
+export default function ColumnPicker({ columnSettings, onToggleColumn, onClose, onResetToDefaults }) {
     const groups = columnSettings.reduce((acc, col) => {
         (acc[col.category] = acc[col.category] || []).push(col);
         return acc;
@@ -184,9 +198,16 @@ export default function ColumnPicker({ columnSettings, onToggleColumn, onClose }
                 <div style={{ height: "8px" }}></div>
             </div>
             <div style={pickerFooterStyle}>
+                <button 
+                    onClick={onResetToDefaults} 
+                    style={defaultButtonStyle} 
+                    className="column-picker-default"
+                >
+                    Default Columns
+                </button>
                 <button onClick={onClose} style={doneButtonStyle} className="column-picker-done">
-                Done
-            </button>
+                    Done
+                </button>
             </div>
         </div>
     );
