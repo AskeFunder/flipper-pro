@@ -14,8 +14,9 @@ router.get('/', async (req, res) => {
     
     // Execute git log command to get commits from main branch with full message
     // Using a custom delimiter to separate commits
+    // %s = subject, %b = body, combining them to get full message
     const { stdout } = await execAsync(
-      'git log main --date=iso --pretty=format:"---COMMIT_START---%n%h|%ad|%B---COMMIT_END---"',
+      'git log main --date=iso --pretty=format:"---COMMIT_START---%n%h|%ad|%s%n%b---COMMIT_END---"',
       { cwd: rootDir, maxBuffer: 1024 * 1024 * 10 } // 10MB buffer
     );
 
@@ -30,13 +31,13 @@ router.get('/', async (req, res) => {
       // First line contains hash|date
       const [hash, date] = lines[0].split('|');
       
-      // Rest of the lines are the commit message
+      // Rest of the lines are the commit message (subject + body)
       const message = lines.slice(1).join('\n').trim();
       
       return {
         hash: hash.trim(),
         date: date.trim(),
-        message: message
+        message: message || 'No commit message'
       };
     });
 
