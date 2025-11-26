@@ -102,17 +102,17 @@ async function pollLatest() {
         now = mockResult.now;
     } else {
         // Normal API fetch
-        const res = await fetch("https://prices.runescape.wiki/api/v1/osrs/latest", {
-            headers: {
-                "User-Agent": "flipperpro-dev - @montemarto" // Update this!
-            }
-        });
-
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status} - ${await res.text()}`);
+    const res = await fetch("https://prices.runescape.wiki/api/v1/osrs/latest", {
+        headers: {
+            "User-Agent": "flipperpro-dev - @montemarto" // Update this!
         }
+    });
 
-        const json = await res.json();
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} - ${await res.text()}`);
+    }
+
+    const json = await res.json();
         data = json.data;
         now = Math.floor(Date.now() / 1000);
     }

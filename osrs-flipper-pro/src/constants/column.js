@@ -36,5 +36,21 @@ export const allColumns = [
     { id: "buy_sell_rate_1h", label: "Buy/Sell Rate (1h)", visible: false, category: "Buy/Sell Ratio" },
     { id: "buy_sell_rate_6h", label: "Buy/Sell Rate (6h)", visible: false, category: "Buy/Sell Ratio" },
     { id: "buy_sell_rate_24h", label: "Buy/Sell Rate (24h)", visible: false, category: "Buy/Sell Ratio" },
-    { id: "buy_sell_rate_7d", label: "Buy/Sell Rate (7d)", visible: false, category: "Buy/Sell Ratio" },
+    { id: "buy_sell_rate_1w", label: "Buy/Sell Rate (1w)", visible: false, category: "Buy/Sell Ratio" },
+
+    // Aggregated Prices
+    { id: "price_5m_high", label: "Price 5m High", visible: false, category: "Aggregated Prices" },
+    { id: "price_5m_low", label: "Price 5m Low", visible: false, category: "Aggregated Prices" },
+    { id: "price_1h_high", label: "Price 1h High", visible: false, category: "Aggregated Prices" },
+    { id: "price_1h_low", label: "Price 1h Low", visible: false, category: "Aggregated Prices" },
+    { id: "price_6h_high", label: "Price 6h High", visible: false, category: "Aggregated Prices" },
+    { id: "price_6h_low", label: "Price 6h Low", visible: false, category: "Aggregated Prices" },
+    { id: "price_24h_high", label: "Price 24h High", visible: false, category: "Aggregated Prices" },
+    { id: "price_24h_low", label: "Price 24h Low", visible: false, category: "Aggregated Prices" },
+    { id: "price_1w_high", label: "Price 1w High", visible: false, category: "Aggregated Prices" },
+    { id: "price_1w_low", label: "Price 1w Low", visible: false, category: "Aggregated Prices" },
+    { id: "price_1m_high", label: "Price 1m High", visible: false, category: "Aggregated Prices" },
+    { id: "price_1m_low", label: "Price 1m Low", visible: false, category: "Aggregated Prices" },
+    { id: "price_3m_high", label: "Price 3m High", visible: false, category: "Aggregated Prices" },
+    { id: "price_3m_low", label: "Price 3m Low", visible: false, category: "Aggregated Prices" },
 ];

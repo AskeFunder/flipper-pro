@@ -247,7 +247,7 @@ ChartJS.register({
 
 const API_BASE = "http://localhost:3001";
 
-const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m'];
+const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m', '3m', '1y'];
 
 const timeOptions = [
     { label: '4H', ms: 4 * 3600e3, granularity: '4h' },
@@ -688,8 +688,9 @@ export default function ItemDetailPage() {
             trendKey = 'trend_1w';
             volumeKey = 'volume_7d';  // Database still uses 7d for volume
             turnoverKey = 'turnover_7d';  // Database still uses 7d for turnover
-        } else if (gran === '1m') {
-            trendKey = 'trend_1m';
+        } else if (gran === '1m' || gran === '3m' || gran === '1y') {
+            trendKey = `trend_${gran}`;
+            // Volume and turnover don't exist for 3m and 1y, so they'll be null
             volumeKey = `volume_${gran}`;
             turnoverKey = `turnover_${gran}`;
         } else {
@@ -719,13 +720,28 @@ export default function ItemDetailPage() {
             price_low: null,
         };
 
-        // Price fields only exist for 5m and 1h
+        // Price fields exist for 5m, 1h, 6h, 24h, 1w, 1m, and 3m
         if (gran === '5m') {
             metrics.price_high = canonicalData.price_5m_high || null;
             metrics.price_low = canonicalData.price_5m_low || null;
         } else if (gran === '1h') {
             metrics.price_high = canonicalData.price_1h_high || null;
             metrics.price_low = canonicalData.price_1h_low || null;
+        } else if (gran === '6h') {
+            metrics.price_high = canonicalData.price_6h_high || null;
+            metrics.price_low = canonicalData.price_6h_low || null;
+        } else if (gran === '24h') {
+            metrics.price_high = canonicalData.price_24h_high || null;
+            metrics.price_low = canonicalData.price_24h_low || null;
+        } else if (gran === '1w') {
+            metrics.price_high = canonicalData.price_1w_high || null;
+            metrics.price_low = canonicalData.price_1w_low || null;
+        } else if (gran === '1m') {
+            metrics.price_high = canonicalData.price_1m_high || null;
+            metrics.price_low = canonicalData.price_1m_low || null;
+        } else if (gran === '3m') {
+            metrics.price_high = canonicalData.price_3m_high || null;
+            metrics.price_low = canonicalData.price_3m_low || null;
         }
 
         return metrics;
@@ -1722,23 +1738,6 @@ export default function ItemDetailPage() {
                         />
                     )}
                 </div>
-
-                {/* Additional trend fields (3m and 1y) - not granularity-specific */}
-                {(canonicalData.trend_3m != null || canonicalData.trend_1y != null) && (
-                    <div style={{ marginTop: "24px" }}>
-                        <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px", color: "#374151" }}>
-                            Extended Trends
-                        </h3>
-                        <div style={gridStyle}>
-                            {canonicalData.trend_3m != null && (
-                                <Field label="Trend (3m)" value={formatRoi(canonicalData.trend_3m)} />
-                            )}
-                            {canonicalData.trend_1y != null && (
-                                <Field label="Trend (1y)" value={formatRoi(canonicalData.trend_1y)} />
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
@@ -1771,6 +1770,8 @@ function TrendField({ label, value, itemId, granularity }) {
             // Map granularity to trend key
             const trendKey = granularity === '1w' ? 'trend_1w' : 
                            granularity === '1m' ? 'trend_1m' :
+                           granularity === '3m' ? 'trend_3m' :
+                           granularity === '1y' ? 'trend_1y' :
                            `trend_${granularity}`;
             
             const res = await fetch(`${API_BASE}/api/items/trend-details/${itemId}`);

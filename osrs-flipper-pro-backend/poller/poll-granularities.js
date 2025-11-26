@@ -30,8 +30,18 @@ async function pollGranularity(gran) {
 
     try {
         const { data } = await axios.get(url, { headers });
-        // For 5m granularity, add 5 minutes (300 seconds) to timestamp to represent end of window
-        const ts = data.timestamp + (gran === "5m" ? 300 : 0);
+        // Add offset to timestamp to represent end of window instead of start
+        // 5m: add 5 minutes (300 seconds), 1h: add 1 hour (3600 seconds), 6h: add 6 hours (21600 seconds), 24h: add 24 hours (86400 seconds)
+        let ts = data.timestamp;
+        if (gran === "5m") {
+            ts += 300; // 5 minutes
+        } else if (gran === "1h") {
+            ts += 3600; // 1 hour
+        } else if (gran === "6h") {
+            ts += 21600; // 6 hours
+        } else if (gran === "24h") {
+            ts += 86400; // 24 hours
+        }
         const payload = data.data || {};
 
         // Skip if already full

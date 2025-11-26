@@ -111,6 +111,11 @@ export default function CanonicalDataDisplay({ data }) {
             fields: [
                 { key: "buy_sell_rate_5m", label: "Buy/Sell Rate (5m)" },
                 { key: "buy_sell_rate_1h", label: "Buy/Sell Rate (1h)" },
+                { key: "buy_sell_rate_6h", label: "Buy/Sell Rate (6h)" },
+                { key: "buy_sell_rate_24h", label: "Buy/Sell Rate (24h)" },
+                { key: "buy_sell_rate_1w", label: "Buy/Sell Rate (1w)" },
+                { key: "buy_sell_rate_1m", label: "Buy/Sell Rate (1m)" },
+                { key: "buy_sell_rate_3m", label: "Buy/Sell Rate (3m)" },
             ]
         },
         {
@@ -120,6 +125,16 @@ export default function CanonicalDataDisplay({ data }) {
                 { key: "price_5m_low", label: "Price 5m Low" },
                 { key: "price_1h_high", label: "Price 1h High" },
                 { key: "price_1h_low", label: "Price 1h Low" },
+                { key: "price_6h_high", label: "Price 6h High" },
+                { key: "price_6h_low", label: "Price 6h Low" },
+                { key: "price_24h_high", label: "Price 24h High" },
+                { key: "price_24h_low", label: "Price 24h Low" },
+                { key: "price_1w_high", label: "Price 1w High" },
+                { key: "price_1w_low", label: "Price 1w Low" },
+                { key: "price_1m_high", label: "Price 1m High" },
+                { key: "price_1m_low", label: "Price 1m Low" },
+                { key: "price_3m_high", label: "Price 3m High" },
+                { key: "price_3m_low", label: "Price 3m Low" },
             ]
         },
     ];

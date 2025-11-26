@@ -15,19 +15,19 @@ const CONFIG = {
     },
     "1h": {
         intervalSeconds: 3600,
-        retentionHours: 24 * 7,
+        retentionHours: 24 * 7 + 1, // 7 days + 1 hour to ensure we have the first datapoint in the 7-day window
         endpoint: "1h",
         table: "price_1h"
     },
     "6h": {
         intervalSeconds: 21600,
-        retentionHours: 24 * 30,
+        retentionHours: 24 * 30 + 6, // 30 days + 6 hours to ensure we have the first datapoint in the 30-day window
         endpoint: "6h",
         table: "price_6h"
     },
     "24h": {
         intervalSeconds: 86400,
-        retentionHours: 24 * 365,
+        retentionHours: 24 * 365 + 24, // 365 days + 1 day to ensure we have the first datapoint in the 365-day window
         endpoint: "24h",
         table: "price_24h"
     }
