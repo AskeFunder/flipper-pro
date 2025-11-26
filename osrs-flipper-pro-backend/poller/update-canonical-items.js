@@ -130,24 +130,498 @@ function buildEISExpression(tableName, targetParam, windowStartParam, windowEndP
 }
 
 /**
+ * Audit log function for trend anomalies (PHASE 5B)
+ * Only logs when status is stale, unavailable, or guard triggers
+ * 
+ * NOTE: Audit logging is disabled in production to avoid console spam.
+ * To enable for testing, set ENABLE_TREND_AUDIT_LOGS=true in .env
+ */
+function auditTrendAnomaly(itemId, trendType, status, nowTimestamp, targetTimestamp, matchedTimestamp, source, reason) {
+    // Only log anomalies, not valid trends
+    if (status === "valid") return;
+    
+    // Only log if explicitly enabled via environment variable
+    if (process.env.ENABLE_TREND_AUDIT_LOGS !== 'true') return;
+    
+    console.log(`[TREND-AUDIT] ${trendType} anomaly for item ${itemId}:`, {
+        itemId,
+        trendType,
+        status,
+        nowTimestamp: nowTimestamp ? new Date(nowTimestamp * 1000).toISOString() : null,
+        targetTimestamp: targetTimestamp ? new Date(targetTimestamp * 1000).toISOString() : null,
+        matchedTimestamp: matchedTimestamp ? new Date(matchedTimestamp * 1000).toISOString() : null,
+        source: source || "unknown",
+        reason: reason || "unknown"
+    });
+}
+
+/**
+ * Pure function to calculate trend from candles following strict rules (PHASE 5A - with guards)
+ * 
+ * @param {Array<Object>} candles - Array of candle objects with {timestamp, avg_high, avg_low}
+ * @param {number} periodSeconds - Period in seconds (e.g., 60 * 60 for 1H)
+ * @param {number} toleranceSeconds - Tolerance in seconds (e.g., 5 * 60 for ±5 min)
+ * @param {Object} auditContext - Optional: {itemId, trendType, source} for audit logging
+ * @returns {Object} - {value: number | null, status: "valid" | "unavailable", nowTimestamp, targetTimestamp, matchedTimestamp}
+ */
+function calculateTrendFromCandles(candles, periodSeconds, toleranceSeconds, auditContext = null) {
+    if (!candles || candles.length === 0) {
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp: null,
+            targetTimestamp: null,
+            matchedTimestamp: null
+        };
+    }
+    
+    // Calculate mid price helper
+    const getMidPrice = (candle) => {
+        if (candle.avg_high != null && candle.avg_low != null) {
+            return (candle.avg_high + candle.avg_low) / 2.0;
+        }
+        if (candle.avg_high != null) {
+            return candle.avg_high;
+        }
+        if (candle.avg_low != null) {
+            return candle.avg_low;
+        }
+        return null;
+    };
+    
+    // Find latest candle timestamp (not system time)
+    const sortedCandles = candles
+        .filter(c => c.timestamp != null)
+        .sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (sortedCandles.length === 0) {
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp: null,
+            targetTimestamp: null,
+            matchedTimestamp: null
+        };
+    }
+    
+    const nowTimestamp = sortedCandles[0].timestamp; // Latest candle timestamp
+    const targetTimestamp = nowTimestamp - periodSeconds; // Target time (60 min ago)
+    
+    // PHASE 5A - Hard guard: targetTimestamp must not be in the future
+    const systemNow = Math.floor(Date.now() / 1000);
+    if (targetTimestamp > systemNow) {
+        const reason = `targetTimestamp (${new Date(targetTimestamp * 1000).toISOString()}) is in the future (system: ${new Date(systemNow * 1000).toISOString()})`;
+        if (auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", nowTimestamp, targetTimestamp, null, auditContext.source, reason);
+        }
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp,
+            targetTimestamp,
+            matchedTimestamp: null
+        };
+    }
+    
+    // Precompute tolerance bounds for performance (PHASE 5C)
+    const toleranceLower = targetTimestamp - toleranceSeconds;
+    const toleranceUpper = targetTimestamp + toleranceSeconds;
+    
+    // Find candle within tolerance
+    let matchedCandle = null;
+    let minDistance = Infinity;
+    
+    for (const candle of sortedCandles) {
+        // Skip candles outside tolerance bounds (performance optimization)
+        if (candle.timestamp < toleranceLower || candle.timestamp > toleranceUpper) {
+            continue;
+        }
+        
+        const distance = Math.abs(candle.timestamp - targetTimestamp);
+        if (distance < minDistance) {
+            minDistance = distance;
+            matchedCandle = candle;
+        }
+    }
+    
+    // If no candle found within tolerance, return unavailable
+    if (!matchedCandle) {
+        const reason = `No candle found within tolerance (${toleranceSeconds}s) of target`;
+        if (auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", nowTimestamp, targetTimestamp, null, auditContext.source, reason);
+        }
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp,
+            targetTimestamp,
+            matchedTimestamp: null
+        };
+    }
+    
+    const matchedTimestamp = matchedCandle.timestamp;
+    
+    // PHASE 5A - Hard guard: matchedTimestamp must not be after nowTimestamp
+    if (matchedTimestamp > nowTimestamp) {
+        const reason = `matchedTimestamp (${new Date(matchedTimestamp * 1000).toISOString()}) is after nowTimestamp (${new Date(nowTimestamp * 1000).toISOString()})`;
+        if (auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", nowTimestamp, targetTimestamp, matchedTimestamp, auditContext.source, reason);
+        }
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp,
+            targetTimestamp,
+            matchedTimestamp: null
+        };
+    }
+    
+    // PHASE 5A - Hard guard: matchedTimestamp must be within tolerance
+    const actualDistance = Math.abs(matchedTimestamp - targetTimestamp);
+    if (actualDistance > toleranceSeconds) {
+        const reason = `matchedTimestamp distance (${actualDistance}s) exceeds tolerance (${toleranceSeconds}s)`;
+        if (auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", nowTimestamp, targetTimestamp, matchedTimestamp, auditContext.source, reason);
+        }
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp,
+            targetTimestamp,
+            matchedTimestamp: null
+        };
+    }
+    
+    // Calculate prices
+    const priceNow = getMidPrice(sortedCandles[0]);
+    const priceThen = getMidPrice(matchedCandle);
+    
+    // If either price is null, return unavailable
+    if (priceNow == null || priceThen == null || priceThen === 0) {
+        const reason = priceNow == null ? "priceNow is null" : (priceThen == null ? "priceThen is null" : "priceThen is zero");
+        if (auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", nowTimestamp, targetTimestamp, matchedTimestamp, auditContext.source, reason);
+        }
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp,
+            targetTimestamp,
+            matchedTimestamp
+        };
+    }
+    
+    // Safeguard 1: If price_then < 10, force unavailable (prevents extreme trends from very low prices)
+    if (priceThen < 10) {
+        const reason = "price-too-low";
+        if (auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", nowTimestamp, targetTimestamp, matchedTimestamp, auditContext.source, reason);
+        }
+        return {
+            value: null,
+            status: "unavailable",
+            nowTimestamp,
+            targetTimestamp,
+            matchedTimestamp
+        };
+    }
+    
+    // Calculate trend
+    const trend = ((priceNow - priceThen) / priceThen) * 100;
+    
+    // Safeguard 2: Cap trend values to MAX_TREND = 100000 (±100,000%)
+    const MAX_TREND = 100000;
+    const cappedTrend = Math.max(-MAX_TREND, Math.min(MAX_TREND, trend));
+    
+    // Log if capping occurred (this is a safeguard, not an anomaly, but worth logging)
+    // Only log if explicitly enabled via environment variable
+    if (cappedTrend !== trend && auditContext && process.env.ENABLE_TREND_AUDIT_LOGS === 'true') {
+        console.log(`[TREND-CAP] ${auditContext.trendType} for item ${auditContext.itemId}: ${trend.toFixed(2)}% capped to ${cappedTrend.toFixed(2)}%`);
+    }
+    
+    return {
+        value: cappedTrend,
+        status: "valid",
+        nowTimestamp,
+        targetTimestamp,
+        matchedTimestamp
+    };
+}
+
+/**
+ * Calculate 1H trend using ONLY 5-minute candles (PHASE 1)
+ * 
+ * @param {Array<number>} itemIds - Array of item IDs
+ * @param {number} now - Current system timestamp (for query bounds)
+ * @returns {Promise<Map<number, number | null>>} - Map of itemId -> trend_1h value or null
+ */
+async function calculate1HTrendFrom5mCandles(itemIds, now) {
+    if (itemIds.length === 0) return new Map();
+    
+    const periodSeconds = 60 * 60; // 1 hour in seconds
+    const toleranceSeconds = 5 * 60; // ±5 minutes in seconds
+    
+    // Fetch all 5m candles for these items within a reasonable window
+    // We need candles from (now - 2 hours) to now to ensure we have latest + target
+    const windowStart = now - (2 * 60 * 60); // 2 hours ago
+    const windowEnd = now;
+    
+    const result = await db.query(`
+        SELECT 
+            item_id,
+            timestamp,
+            avg_high,
+            avg_low
+        FROM price_5m
+        WHERE item_id = ANY($1)
+          AND timestamp >= $2
+          AND timestamp <= $3
+          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+        ORDER BY item_id, timestamp DESC
+    `, [itemIds, windowStart, windowEnd]);
+    
+    // Group candles by item_id
+    const candlesByItem = new Map();
+    for (const row of result.rows) {
+        if (!candlesByItem.has(row.item_id)) {
+            candlesByItem.set(row.item_id, []);
+        }
+        candlesByItem.get(row.item_id).push({
+            timestamp: row.timestamp, // Keep in seconds (database format)
+            avg_high: row.avg_high,
+            avg_low: row.avg_low
+        });
+    }
+    
+    // Calculate trend for each item (PHASE 5C - cache timestamps per batch)
+    const trendMap = new Map();
+    for (const itemId of itemIds) {
+        const candles = candlesByItem.get(itemId) || [];
+        const auditContext = { itemId, trendType: "1H", source: "5m" };
+        const trendResult = calculateTrendFromCandles(candles, periodSeconds, toleranceSeconds, auditContext);
+        
+        // Audit log for unavailable status
+        if (trendResult.status === "unavailable" && auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", 
+                trendResult.nowTimestamp, trendResult.targetTimestamp, trendResult.matchedTimestamp, 
+                auditContext.source, "No valid trend calculated");
+        }
+        
+        trendMap.set(itemId, trendResult.status === "valid" ? trendResult.value : null);
+    }
+    
+    return trendMap;
+}
+
+/**
+ * Calculate 6H trend using ONLY 5-minute candles (PHASE 2)
+ * 
+ * @param {Array<number>} itemIds - Array of item IDs
+ * @param {number} now - Current system timestamp (for query bounds)
+ * @returns {Promise<Map<number, number | null>>} - Map of itemId -> trend_6h value or null
+ */
+async function calculate6HTrendFrom5mCandles(itemIds, now) {
+    if (itemIds.length === 0) return new Map();
+    
+    const periodSeconds = 6 * 60 * 60; // 6 hours in seconds
+    const toleranceSeconds = 20 * 60; // ±20 minutes in seconds
+    
+    // Fetch all 5m candles for these items within a reasonable window
+    // We need candles from (now - 8 hours) to now to ensure we have latest + target
+    const windowStart = now - (8 * 60 * 60); // 8 hours ago
+    const windowEnd = now;
+    
+    const result = await db.query(`
+        SELECT 
+            item_id,
+            timestamp,
+            avg_high,
+            avg_low
+        FROM price_5m
+        WHERE item_id = ANY($1)
+          AND timestamp >= $2
+          AND timestamp <= $3
+          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+        ORDER BY item_id, timestamp DESC
+    `, [itemIds, windowStart, windowEnd]);
+    
+    // Group candles by item_id
+    const candlesByItem = new Map();
+    for (const row of result.rows) {
+        if (!candlesByItem.has(row.item_id)) {
+            candlesByItem.set(row.item_id, []);
+        }
+        candlesByItem.get(row.item_id).push({
+            timestamp: row.timestamp, // Keep in seconds (database format)
+            avg_high: row.avg_high,
+            avg_low: row.avg_low
+        });
+    }
+    
+    // Calculate trend for each item (PHASE 5C - cache timestamps per batch)
+    const trendMap = new Map();
+    for (const itemId of itemIds) {
+        const candles = candlesByItem.get(itemId) || [];
+        const auditContext = { itemId, trendType: "6H", source: "5m" };
+        const trendResult = calculateTrendFromCandles(candles, periodSeconds, toleranceSeconds, auditContext);
+        
+        // Audit log for unavailable status
+        if (trendResult.status === "unavailable" && auditContext) {
+            auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "unavailable", 
+                trendResult.nowTimestamp, trendResult.targetTimestamp, trendResult.matchedTimestamp, 
+                auditContext.source, "No valid trend calculated");
+        }
+        
+        trendMap.set(itemId, trendResult.status === "valid" ? trendResult.value : null);
+    }
+    
+    return trendMap;
+}
+
+/**
+ * Calculate 24H trend with controlled fallback (PHASE 3 + PHASE 4)
+ * Primary: 5m candles (status: "valid"), Fallback: 1h candles (status: "stale")
+ * 
+ * @param {Array<number>} itemIds - Array of item IDs
+ * @param {number} now - Current system timestamp (for query bounds)
+ * @returns {Promise<Map<number, {value: number | null, status: string}>>} - Map of itemId -> {value, status}
+ */
+async function calculate24HTrendWithFallback(itemIds, now) {
+    if (itemIds.length === 0) return new Map();
+    
+    const periodSeconds = 24 * 60 * 60; // 24 hours in seconds
+    const toleranceSeconds = 60 * 60; // ±1 hour in seconds
+    
+    // Fetch all 5m candles for these items (primary attempt)
+    const windowStart5m = now - (26 * 60 * 60); // 26 hours ago (24h + 2h buffer)
+    const windowEnd = now;
+    
+    const result5m = await db.query(`
+        SELECT 
+            item_id,
+            timestamp,
+            avg_high,
+            avg_low
+        FROM price_5m
+        WHERE item_id = ANY($1)
+          AND timestamp >= $2
+          AND timestamp <= $3
+          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+        ORDER BY item_id, timestamp DESC
+    `, [itemIds, windowStart5m, windowEnd]);
+    
+    // Group 5m candles by item_id
+    const candles5mByItem = new Map();
+    for (const row of result5m.rows) {
+        if (!candles5mByItem.has(row.item_id)) {
+            candles5mByItem.set(row.item_id, []);
+        }
+        candles5mByItem.get(row.item_id).push({
+            timestamp: row.timestamp,
+            avg_high: row.avg_high,
+            avg_low: row.avg_low
+        });
+    }
+    
+    // Try primary (5m) for each item
+    const trendMap = new Map();
+    const itemsNeedingFallback = [];
+    
+    for (const itemId of itemIds) {
+        const candles5m = candles5mByItem.get(itemId) || [];
+        const auditContext = { itemId, trendType: "24H", source: "5m" };
+        const trendResult = calculateTrendFromCandles(candles5m, periodSeconds, toleranceSeconds, auditContext);
+        
+        if (trendResult.status === "valid") {
+            // Found via 5m candles → status: "valid"
+            trendMap.set(itemId, { value: trendResult.value, status: "valid" });
+        } else {
+            // Mark for fallback
+            itemsNeedingFallback.push(itemId);
+            trendMap.set(itemId, { value: null, status: "unavailable" }); // Temporary, will be overwritten if fallback succeeds
+        }
+    }
+    
+    // Fallback: Try 1h candles for items that failed primary
+    if (itemsNeedingFallback.length > 0) {
+        const windowStart1h = now - (26 * 60 * 60); // 26 hours ago
+        const result1h = await db.query(`
+            SELECT 
+                item_id,
+                timestamp,
+                avg_high,
+                avg_low
+            FROM price_1h
+            WHERE item_id = ANY($1)
+              AND timestamp >= $2
+              AND timestamp <= $3
+              AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+            ORDER BY item_id, timestamp DESC
+        `, [itemsNeedingFallback, windowStart1h, windowEnd]);
+        
+        // Group 1h candles by item_id
+        const candles1hByItem = new Map();
+        for (const row of result1h.rows) {
+            if (!candles1hByItem.has(row.item_id)) {
+                candles1hByItem.set(row.item_id, []);
+            }
+            candles1hByItem.get(row.item_id).push({
+                timestamp: row.timestamp,
+                avg_high: row.avg_high,
+                avg_low: row.avg_low
+            });
+        }
+        
+        // Try fallback (1h) for items that failed primary
+        for (const itemId of itemsNeedingFallback) {
+            const candles1h = candles1hByItem.get(itemId) || [];
+            const auditContext = { itemId, trendType: "24H", source: "1h (fallback)" };
+            const trendResult = calculateTrendFromCandles(candles1h, periodSeconds, toleranceSeconds, auditContext);
+            
+            if (trendResult.status === "valid") {
+                // Found via 1h fallback → status: "stale"
+                trendMap.set(itemId, { value: trendResult.value, status: "stale" });
+                // Audit log for stale status (PHASE 5B)
+                auditTrendAnomaly(auditContext.itemId, auditContext.trendType, "stale", 
+                    trendResult.nowTimestamp, trendResult.targetTimestamp, trendResult.matchedTimestamp, 
+                    auditContext.source, "Fallback to 1h candles used");
+            } else {
+                // Still unavailable
+                trendMap.set(itemId, { value: null, status: "unavailable" });
+                // Audit log already handled in calculateTrendFromCandles
+            }
+        }
+    }
+    
+    return trendMap;
+}
+
+/**
  * Calculate all trends for a batch of items using optimized bulk queries
  * Uses bulk queries per granularity instead of per-item LATERAL joins for massive performance gains
  * 
  * @param {Array<number>} itemIds - Array of item IDs
  * @param {number} now - Current timestamp
- * @returns {Promise<Map<number, Object>>} - Map of itemId -> {trend_5m, trend_1h, trend_6h, trend_24h, trend_7d, trend_1m, trend_3m, trend_1y}
+ * @returns {Promise<Map<number, Object>>} - Map of itemId -> {trend_5m, trend_1h, trend_6h, trend_24h, trend_1w, trend_1m, trend_3m, trend_1y}
  */
 async function calculateBatchTrends(itemIds, now) {
     const startTime = Date.now();
     if (itemIds.length === 0) return new Map();
     
+    // Note: trend_1h is now calculated using first vs last point in 1h window (same as graph)
+    // No longer using calculate1HTrendFrom5mCandles to ensure consistency with graph display
+    
     // Trend window definitions (in seconds)
+    // NOTE: '1h' and '1w' are excluded from this loop as they're calculated separately above
+    // NOTE: '6h' and '24h' are now calculated in the loop like '5m' and '1h' for consistency
     const windows = {
         '5m': { length: 300, strict: false },
-        '1h': { length: 3600, strict: false },
-        '6h': { length: 21600, strict: false },
+        '1h': { length: 3600, strict: false }, // Used for first vs last point calculation
+        '6h': { length: 21600, strict: false }, // Used for first vs last point calculation
+        // '24h': { length: 86400, strict: false }, // Calculated separately using calculate24HTrendWithFallback
+        // '7d': { length: 604800, strict: false }, // Calculated separately using calculate7DTrendFrom1hCandles
         '24h': { length: 86400, strict: false },
-        '7d': { length: 604800, strict: false },
+        '1w': { length: 604800, strict: false }, // 1 week in seconds (calculated separately)
         '1m': { length: 2592000, strict: false },
         '3m': { length: 7776000, strict: false },
         '1y': { length: 31536000, strict: true }
@@ -381,16 +855,295 @@ async function calculateBatchTrends(itemIds, now) {
     const trendMap = new Map();
     for (const itemId of itemIds) {
         const trends = {};
+        
+        // Calculate trends using first vs last point in window (like the graph shows)
+        // This ensures consistency between what's displayed in the graph and what's stored in canonical_items
         for (const trendName of Object.keys(windows)) {
-            const startKey = `${itemId}_${trendName}_start`;
-            const endKey = `${itemId}_${trendName}_end`;
-            const startPrice = priceMap.get(startKey);
-            const endPrice = priceMap.get(endKey);
-            
-            if (startPrice == null || startPrice === 0 || endPrice == null) {
-                trends[`trend_${trendName}`] = null;
+            if (trendName === '5m') {
+                // For trend_5m, find latest datapoint within last 5 minutes, then compare with price from 5 minutes before that
+                // - Current price: Latest mid price from price_5m where timestamp >= now - 300
+                // - Historical price: Mid price from price_5m where timestamp <= (latest_timestamp - 300)
+                
+                const fiveMinutesAgo = now - 300;
+                
+                // Get latest price from price_5m within last 5 minutes
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_5m
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, fiveMinutesAgo]);
+                
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const fiveMinutesBeforeLatest = latestTimestamp - 300;
+                    
+                    // Get price from 5 minutes before the latest datapoint
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_5m
+                        WHERE item_id = $1
+                          AND timestamp <= $2
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    `, [itemId, fiveMinutesBeforeLatest]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_5m = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_5m = null;
+                    }
+                } else {
+                    trends.trend_5m = null;
+                }
+            } else if (trendName === '1h') {
+                // For trend_1h, use same latest datapoint as trend_5m (within last 5 minutes), then compare with price from 1 hour before that
+                // - Current price: Latest mid price from price_5m where timestamp >= now - 300 (same as trend_5m)
+                // - Historical price: Mid price from price_5m where timestamp <= (latest_timestamp - 3600)
+                
+                const fiveMinutesAgo = now - 300;
+                
+                // Get latest price from price_5m within last 5 minutes (same as trend_5m)
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_5m
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, fiveMinutesAgo]);
+                
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const oneHourBeforeLatest = latestTimestamp - 3600;
+                    
+                    // Get price from 1 hour before the latest datapoint
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_5m
+                        WHERE item_id = $1
+                          AND timestamp <= $2
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    `, [itemId, oneHourBeforeLatest]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_1h = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_1h = null;
+                    }
+                } else {
+                    trends.trend_1h = null;
+                }
+            } else if (trendName === '6h') {
+                // For trend_6h, use same latest datapoint as trend_5m (within last 5 minutes), then compare with price from 6 hours before that
+                // - Current price: Latest mid price from price_5m where timestamp >= now - 300 (same as trend_5m)
+                // - Historical price: Mid price from price_5m where timestamp <= (latest_timestamp - 21600)
+                
+                const fiveMinutesAgo = now - 300;
+                
+                // Get latest price from price_5m within last 5 minutes (same as trend_5m)
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_5m
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, fiveMinutesAgo]);
+                
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const sixHoursBeforeLatest = latestTimestamp - 21600;
+                    
+                    // Get price from 6 hours before the latest datapoint
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_5m
+                        WHERE item_id = $1
+                          AND timestamp <= $2
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    `, [itemId, sixHoursBeforeLatest]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_6h = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_6h = null;
+                    }
+                } else {
+                    trends.trend_6h = null;
+                }
+            } else if (trendName === '24h') {
+                // For trend_24h, use same latest datapoint as trend_5m (within last 5 minutes), then compare with price from 24 hours before that
+                // - Current price: Latest mid price from price_5m where timestamp >= now - 300 (same as trend_5m)
+                // - Historical price: Mid price from price_5m where timestamp <= (latest_timestamp - 86400)
+                
+                const fiveMinutesAgo = now - 300;
+                
+                // Get latest price from price_5m within last 5 minutes (same as trend_5m)
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_5m
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, fiveMinutesAgo]);
+                
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const twentyFourHoursBeforeLatest = latestTimestamp - 86400;
+                    
+                    // Get price from 24 hours before the latest datapoint
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_5m
+                        WHERE item_id = $1
+                          AND timestamp <= $2
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    `, [itemId, twentyFourHoursBeforeLatest]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_24h = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_24h = null;
+                    }
+                } else {
+                    trends.trend_24h = null;
+                }
+            } else if (trendName === '1m') {
+                // For trend_1m, use first vs last point in 1m window (same as graph)
+                // The 1m graph uses price_6h data, so we use price_6h for consistency
+                const windowStart = now - windows['1m'].length; // 30 days ago
+                const windowEnd = now;
+                
+                // Get first and last points from price_6h (what the 1m graph uses)
+                const firstLastResult = await db.query(`
+                    SELECT 
+                        (SELECT (avg_high + avg_low) / 2.0 AS mid
+                         FROM price_6h
+                         WHERE item_id = $1
+                           AND timestamp >= $2
+                           AND timestamp <= $3
+                           AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                         ORDER BY timestamp ASC
+                         LIMIT 1) AS first_mid,
+                        (SELECT (avg_high + avg_low) / 2.0 AS mid
+                         FROM price_6h
+                         WHERE item_id = $1
+                           AND timestamp >= $2
+                           AND timestamp <= $3
+                           AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                         ORDER BY timestamp DESC
+                         LIMIT 1) AS last_mid
+                `, [itemId, windowStart, windowEnd]);
+                
+                if (firstLastResult.rows.length > 0 && 
+                    firstLastResult.rows[0].first_mid != null && 
+                    firstLastResult.rows[0].last_mid != null &&
+                    firstLastResult.rows[0].first_mid !== 0) {
+                    const firstMid = parseFloat(firstLastResult.rows[0].first_mid);
+                    const lastMid = parseFloat(firstLastResult.rows[0].last_mid);
+                    trends.trend_1m = parseFloat((100.0 * (lastMid - firstMid) / firstMid).toFixed(2));
+                } else {
+                    trends.trend_1m = null;
+                }
+            } else if (trendName === '1w') {
+                // For trend_1w, find the first (earliest) 1h price point within the last hour, 
+                // then look 1 week back from that timestamp and compare
+                const oneHourAgo = now - 3600; // 1 hour ago
+                const oneWeekInSeconds = 7 * 24 * 60 * 60; // 604800 seconds
+                
+                // Get first (earliest) price from price_1h within last hour
+                const firstResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_1h
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp ASC
+                    LIMIT 1
+                `, [itemId, oneHourAgo]);
+                
+                if (firstResult.rows.length > 0 && firstResult.rows[0].mid != null) {
+                    const firstTimestamp = firstResult.rows[0].timestamp;
+                    const firstMid = parseFloat(firstResult.rows[0].mid);
+                    const oneWeekBeforeFirst = firstTimestamp - oneWeekInSeconds;
+                    
+                    // Get price from exactly 1 week before the first datapoint
+                    // Find the closest price point to exactly 1 week back (within tolerance)
+                    const toleranceSeconds = 3600; // ±1 hour tolerance
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_1h
+                        WHERE item_id = $1
+                          AND ABS(timestamp - $2) <= $3
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY ABS(timestamp - $2) ASC, timestamp DESC
+                        LIMIT 1
+                    `, [itemId, oneWeekBeforeFirst, toleranceSeconds]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_1w = parseFloat((100.0 * (firstMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_1w = null;
+                    }
+                } else {
+                    trends.trend_1w = null;
+                }
             } else {
-                trends[`trend_${trendName}`] = parseFloat((100.0 * (endPrice - startPrice) / startPrice).toFixed(2));
+                // For other trends, use the old method (start vs end with tolerance)
+                const startKey = `${itemId}_${trendName}_start`;
+                const endKey = `${itemId}_${trendName}_end`;
+                const startPrice = priceMap.get(startKey);
+                const endPrice = priceMap.get(endKey);
+                
+                if (startPrice == null || startPrice === 0 || endPrice == null) {
+                    trends[`trend_${trendName}`] = null;
+                } else {
+                    trends[`trend_${trendName}`] = parseFloat((100.0 * (endPrice - startPrice) / startPrice).toFixed(2));
+                }
             }
         }
         trendMap.set(itemId, trends);
@@ -764,7 +1517,7 @@ async function updateCanonicalItems() {
                         turnovers.turnover5m ?? '0', turnovers.turnover1h ?? '0', turnovers.turnover6h ?? '0', turnovers.turnover24h ?? '0', turnovers.turnover7d ?? '0', turnovers.turnover1m ?? '0',
                         bsr.bsr5m ?? null, bsr.bsr1h ?? null,
                         trends.trend_5m ?? null, trends.trend_1h ?? null, trends.trend_6h ?? null, trends.trend_24h ?? null,
-                        trends.trend_7d ?? null, trends.trend_1m ?? null, trends.trend_3m ?? null, trends.trend_1y ?? null,
+                        trends.trend_1w ?? null, trends.trend_1m ?? null, trends.trend_3m ?? null, trends.trend_1y ?? null,
                         now
                     ]);
                 }
@@ -798,7 +1551,7 @@ async function updateCanonicalItems() {
                         price_5m_high, price_5m_low, price_1h_high, price_1h_low,
                         turnover_5m, turnover_1h, turnover_6h, turnover_24h, turnover_7d, turnover_1m,
                         buy_sell_rate_5m, buy_sell_rate_1h,
-                        trend_5m, trend_1h, trend_6h, trend_24h, trend_7d, trend_1m, trend_3m, trend_1y,
+                        trend_5m, trend_1h, trend_6h, trend_24h, trend_1w, trend_1m, trend_3m, trend_1y,
                         timestamp_updated
                     ) VALUES ${placeholders}
                     ON CONFLICT (item_id) DO UPDATE SET
@@ -837,7 +1590,7 @@ async function updateCanonicalItems() {
                         trend_1h = EXCLUDED.trend_1h,
                         trend_6h = EXCLUDED.trend_6h,
                         trend_24h = EXCLUDED.trend_24h,
-                        trend_7d = EXCLUDED.trend_7d,
+                        trend_1w = EXCLUDED.trend_1w,
                         trend_1m = EXCLUDED.trend_1m,
                         trend_3m = EXCLUDED.trend_3m,
                         trend_1y = EXCLUDED.trend_1y,
@@ -886,3 +1639,5 @@ if (require.main === module) {
 
 module.exports = updateCanonicalItems;
 module.exports.calculateBatchTrends = calculateBatchTrends;
+module.exports.calculateTrendFromCandles = calculateTrendFromCandles;
+module.exports.auditTrendAnomaly = auditTrendAnomaly;

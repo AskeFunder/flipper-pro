@@ -247,16 +247,16 @@ ChartJS.register({
 
 const API_BASE = "http://localhost:3001";
 
-const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '7d', '1m'];
+const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m'];
 
 const timeOptions = [
     { label: '4H', ms: 4 * 3600e3, granularity: '4h' },
     { label: '12H', ms: 12 * 3600e3, granularity: '5m' },
     { label: '1D', ms: 24 * 3600e3, granularity: '5m' },
     { label: '1W', ms: 7 * 24 * 3600e3, granularity: '1h' },
-    { label: '1M', ms: 30 * 24 * 3600e3, granularity: '6h' },
-    { label: '3M', ms: 90 * 24 * 3600e3, granularity: '24h' },
-    { label: '1Y', ms: 365 * 24 * 3600e3, granularity: '24h' },
+    { label: '1M', ms: 30 * 24 * 3600e3 + 6 * 3600e3, granularity: '6h' }, // 30 days + 6 hours
+    { label: '3M', ms: 90 * 24 * 3600e3 + 24 * 3600e3, granularity: '24h' }, // 90 days + 24 hours
+    { label: '1Y', ms: 365 * 24 * 3600e3 + 24 * 3600e3, granularity: '24h' }, // 365 days + 24 hours
     { label: 'All', ms: 0, granularity: '24h' },
 ];
 
@@ -313,6 +313,15 @@ export default function ItemDetailPage() {
                 const res = await fetch(`${API_BASE}/api/items/canonical/${apiParam}`);
                 if (res.ok) {
                     const data = await res.json();
+                    // Debug: log trend_6h to see if it's in the response
+                    if (data.item_id === 2351) {
+                        console.log('[ItemDetailPage] Canonical data for Iron Bar:', {
+                            trend_6h: data.trend_6h,
+                            trend_5m: data.trend_5m,
+                            trend_1h: data.trend_1h,
+                            trend_24h: data.trend_24h
+                        });
+                    }
                     setCanonicalData(data);
                     setAdvancedLoading(false);
                 } else {
@@ -327,6 +336,9 @@ export default function ItemDetailPage() {
         };
 
         fetchCanonical();
+        // Update canonical data every 15 seconds (same as other live data)
+        const interval = setInterval(fetchCanonical, 15000);
+        return () => clearInterval(interval);
     }, [numericItemId, itemNameSlug]);
 
     // Fetch basic (live) data from /api/prices/latest/:id
@@ -655,11 +667,54 @@ export default function ItemDetailPage() {
 
     // Get metrics for selected granularity from canonical data
     const getGranularityMetrics = (gran) => {
+        if (!canonicalData) {
+            return {
+                volume: null,
+                turnover: null,
+                trend: null,
+                buy_sell_rate: null,
+                price_high: null,
+                price_low: null,
+            };
+        }
+        
+        // Map granularity to the correct field names
+        // Note: volume and turnover still use '7d' in database, but trend uses '1w'
+        let trendKey;
+        let volumeKey;
+        let turnoverKey;
+        
+        if (gran === '1w') {
+            trendKey = 'trend_1w';
+            volumeKey = 'volume_7d';  // Database still uses 7d for volume
+            turnoverKey = 'turnover_7d';  // Database still uses 7d for turnover
+        } else if (gran === '1m') {
+            trendKey = 'trend_1m';
+            volumeKey = `volume_${gran}`;
+            turnoverKey = `turnover_${gran}`;
+        } else {
+            trendKey = `trend_${gran}`;
+            volumeKey = `volume_${gran}`;
+            turnoverKey = `turnover_${gran}`;
+        }
+        
+        // Debug: log when getting metrics for 5m and 6h
+        if (gran === '5m' || gran === '6h') {
+            console.log(`[ItemDetailPage] getGranularityMetrics for ${gran}:`, {
+                trendKey,
+                trendValue: canonicalData[trendKey],
+                trendValueType: typeof canonicalData[trendKey],
+                hasTrendKey: trendKey in canonicalData,
+                allTrendKeys: Object.keys(canonicalData).filter(k => k.includes('trend')),
+                itemId: canonicalData.item_id
+            });
+        }
+        
         const metrics = {
-            volume: canonicalData[`volume_${gran}`] || null,
-            turnover: canonicalData[`turnover_${gran}`] || null,
-            trend: canonicalData[`trend_${gran}`] || null,
-            buy_sell_rate: canonicalData[`buy_sell_rate_${gran}`] || null,
+            volume: canonicalData[volumeKey] != null ? canonicalData[volumeKey] : null,
+            turnover: canonicalData[turnoverKey] != null ? canonicalData[turnoverKey] : null,
+            trend: canonicalData[trendKey] != null ? canonicalData[trendKey] : null,
+            buy_sell_rate: canonicalData[`buy_sell_rate_${gran}`] != null ? canonicalData[`buy_sell_rate_${gran}`] : null,
             price_high: null,
             price_low: null,
         };
@@ -682,12 +737,63 @@ export default function ItemDetailPage() {
     const selected = timeOptions.find(o => o.label === timeRange);
     const granularity = selected ? selected.granularity : '5m';
     const now = Date.now();
-    const minTime = selected ? now - selected.ms : 0;
-    const filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
+    
+    // For 12H, 1D, and 1W, show data from exactly X time before latest datapoint to latest datapoint
+    // This matches the trend calculation logic
+    let filtered;
+    if ((timeRange === '12H' || timeRange === '1D' || timeRange === '1W') && priceData.length > 0) {
+        // Find the latest datapoint (within last 5 minutes, matching trend calculation)
+        const fiveMinutesAgo = now - 5 * 60 * 1000;
+        const latestDataPoint = priceData
+            .filter(p => p.ts * 1000 >= fiveMinutesAgo)
+            .sort((a, b) => b.ts - a.ts)[0];
+        
+        if (latestDataPoint) {
+            const latestTimestamp = latestDataPoint.ts * 1000;
+            let timeBeforeLatest;
+            if (timeRange === '12H') {
+                timeBeforeLatest = latestTimestamp - 12 * 3600 * 1000;
+            } else if (timeRange === '1D') {
+                timeBeforeLatest = latestTimestamp - 24 * 3600 * 1000;
+            } else if (timeRange === '1W') {
+                timeBeforeLatest = latestTimestamp - 7 * 24 * 3600 * 1000;
+            }
+            
+            // Filter to show data from exactly X time before latest to latest
+            filtered = priceData.filter(p => {
+                const pTime = p.ts * 1000;
+                return pTime >= timeBeforeLatest && pTime <= latestTimestamp;
+            });
+        } else {
+            // Fallback to normal filtering if no recent datapoint
+            const minTime = selected ? now - selected.ms : 0;
+            filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
+        }
+    } else {
+        // Normal filtering for other time ranges
+        const minTime = selected ? now - selected.ms : 0;
+        filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
+    }
 
     // Calculate min/max for x-axis - NO PADDING, exact bounds
-    const calculatedXMin = filtered.length > 0 ? new Date(Math.min(...filtered.map(p => p.ts * 1000))) : null;
-    const calculatedXMax = filtered.length > 0 ? new Date(Math.max(...filtered.map(p => p.ts * 1000))) : null;
+    // For 1W, use the calculated timeBeforeLatest as xMin to show exact 7-day window
+    let calculatedXMin = filtered.length > 0 ? new Date(Math.min(...filtered.map(p => p.ts * 1000))) : null;
+    let calculatedXMax = filtered.length > 0 ? new Date(Math.max(...filtered.map(p => p.ts * 1000))) : null;
+    
+    // For 1W, adjust xMin to be exactly 7 days before latest datapoint (even if no datapoint exists there)
+    if (timeRange === '1W' && priceData.length > 0) {
+        const fiveMinutesAgo = now - 5 * 60 * 1000;
+        const latestDataPoint = priceData
+            .filter(p => p.ts * 1000 >= fiveMinutesAgo)
+            .sort((a, b) => b.ts - a.ts)[0];
+        
+        if (latestDataPoint) {
+            const latestTimestamp = latestDataPoint.ts * 1000;
+            const timeBeforeLatest = latestTimestamp - 7 * 24 * 3600 * 1000;
+            calculatedXMin = new Date(timeBeforeLatest);
+            calculatedXMax = new Date(latestTimestamp);
+        }
+    }
     
     // Use zoom bounds if set, otherwise use calculated bounds
     const xMin = zoomBounds.min || calculatedXMin;
@@ -795,6 +901,56 @@ export default function ItemDetailPage() {
     // Count valid data points for buy and sell separately
     const buyDataPoints = filtered.map(p => p.high).filter(v => v != null && v !== undefined && !isNaN(v) && v > 0);
     const sellDataPoints = filtered.map(p => p.low).filter(v => v != null && v !== undefined && !isNaN(v) && v > 0);
+
+    // Calculate trend for zoomed area (if zoomed) - do this before creating chartData
+    // Use the same filtered data that the chart actually displays
+    let zoomTrend = null;
+    if (zoomBounds.min && zoomBounds.max && filtered.length > 0) {
+        const zoomMinTime = zoomBounds.min.getTime();
+        const zoomMaxTime = zoomBounds.max.getTime();
+        
+        // Filter to only datapoints that are actually visible in the zoomed chart
+        // This matches what the chart displays (Chart.js will show data within xMin and xMax)
+        const zoomedData = filtered.filter(p => {
+            const pTime = p.ts * 1000;
+            return pTime >= zoomMinTime && pTime <= zoomMaxTime;
+        });
+        
+        if (zoomedData.length >= 2) {
+            // Sort by timestamp to get first and last datapoints in zoomed area
+            const sortedZoomed = [...zoomedData].sort((a, b) => a.ts - b.ts);
+            const firstPoint = sortedZoomed[0];
+            const lastPoint = sortedZoomed[sortedZoomed.length - 1];
+            
+            // Only calculate if timestamps are different (at least 2 different points)
+            if (firstPoint.ts !== lastPoint.ts) {
+                // Calculate mid prices (same logic as trend calculation in backend)
+                // Use (high + low) / 2 if both exist, otherwise use whichever exists
+                let firstMid = null;
+                if (firstPoint.high != null && firstPoint.low != null) {
+                    firstMid = (firstPoint.high + firstPoint.low) / 2;
+                } else if (firstPoint.high != null) {
+                    firstMid = firstPoint.high;
+                } else if (firstPoint.low != null) {
+                    firstMid = firstPoint.low;
+                }
+                
+                let lastMid = null;
+                if (lastPoint.high != null && lastPoint.low != null) {
+                    lastMid = (lastPoint.high + lastPoint.low) / 2;
+                } else if (lastPoint.high != null) {
+                    lastMid = lastPoint.high;
+                } else if (lastPoint.low != null) {
+                    lastMid = lastPoint.low;
+                }
+                
+                // Calculate trend if we have valid prices (same formula as backend)
+                if (firstMid != null && lastMid != null && firstMid !== 0 && !isNaN(firstMid) && !isNaN(lastMid)) {
+                    zoomTrend = ((lastMid - firstMid) / firstMid) * 100;
+                }
+            }
+        }
+    }
 
     const chartData = {
         labels: filtered.map(p => new Date(p.ts * 1000)),
@@ -1369,37 +1525,60 @@ export default function ItemDetailPage() {
                             </div>
                         ) : (
                             <div style={{ height: '60vh', position: 'relative' }}>
-                                {/* Reset Zoom Button */}
+                                {/* Reset Zoom Button and Zoom Trend */}
                                 {zoomBounds.min && zoomBounds.max && (
-                                    <button
-                                        onClick={() => {
-                                            setZoomBounds({ min: null, max: null });
-                                        }}
+                                    <div
                                         style={{
                                             position: 'absolute',
                                             top: '40px',
                                             left: '50%',
                                             transform: 'translateX(-50%)',
                                             zIndex: 10,
-                                            padding: '6px 12px',
-                                            backgroundColor: '#3b82f6',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontSize: '0.875rem',
-                                            fontWeight: '500',
-                                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.target.style.backgroundColor = '#2563eb';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.target.style.backgroundColor = '#3b82f6';
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                            padding: '8px 16px',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                                         }}
                                     >
-                                        Reset Zoom
-                                    </button>
+                                        {zoomTrend !== null && (
+                                            <div
+                                                style={{
+                                                    fontSize: '0.875rem',
+                                                    fontWeight: '600',
+                                                    color: zoomTrend >= 0 ? '#10b981' : '#ef4444',
+                                                }}
+                                                title={`Trend for zoomed area: ${zoomTrend >= 0 ? '+' : ''}${zoomTrend.toFixed(2)}%`}
+                                            >
+                                                Trend: {zoomTrend >= 0 ? '+' : ''}{zoomTrend.toFixed(2)}%
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                setZoomBounds({ min: null, max: null });
+                                            }}
+                                            style={{
+                                                padding: '6px 12px',
+                                                backgroundColor: '#3b82f6',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.875rem',
+                                                fontWeight: '500',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.backgroundColor = '#2563eb';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.backgroundColor = '#3b82f6';
+                                            }}
+                                        >
+                                            Reset Zoom
+                                        </button>
+                                    </div>
                                 )}
                                 <Line 
                                     key={`chart-${selectedGranularity}`}
@@ -1512,7 +1691,7 @@ export default function ItemDetailPage() {
                         value={granularityMetrics.turnover != null ? formatCompact(granularityMetrics.turnover) : "–"} 
                     />
                     <TrendField 
-                        label={`Trend (${selectedGranularity})`} 
+                        label={selectedGranularity === '1w' ? 'TREND (1W)' : `Trend (${selectedGranularity})`} 
                         value={formatRoi(granularityMetrics.trend)}
                         itemId={canonicalData?.item_id}
                         granularity={selectedGranularity}
@@ -1590,7 +1769,7 @@ function TrendField({ label, value, itemId, granularity }) {
         
         try {
             // Map granularity to trend key
-            const trendKey = granularity === '7d' ? 'trend_7d' : 
+            const trendKey = granularity === '1w' ? 'trend_1w' : 
                            granularity === '1m' ? 'trend_1m' :
                            `trend_${granularity}`;
             
@@ -1693,22 +1872,13 @@ function TrendField({ label, value, itemId, granularity }) {
                                             (({formatPrice(tooltipData.current.mid)} - {formatPrice(tooltipData.previous.mid)}) / {formatPrice(tooltipData.previous.mid)}) × 100
                                             <br />
                                             = {(() => {
-                                                // Calculate trend from current and previous prices
-                                                if (tooltipData.current && tooltipData.previous && 
-                                                    tooltipData.current.mid != null && tooltipData.previous.mid != null && 
-                                                    tooltipData.previous.mid !== 0) {
-                                                    const calculated = ((tooltipData.current.mid - tooltipData.previous.mid) / tooltipData.previous.mid) * 100;
-                                                    return `${calculated.toFixed(2)}%`;
-                                                }
-                                                // Fallback to stored trend value if available
+                                                // SINGLE SOURCE OF TRUTH: Use stored trend value from canonical_items
+                                                // This ensures tooltip shows the same value as the label
                                                 if (tooltipData.trend != null && typeof tooltipData.trend === 'number') {
                                                     return `${tooltipData.trend.toFixed(2)}%`;
                                                 }
-                                                // Fallback to calculatedTrend if available
-                                                if (tooltipData.calculatedTrend != null && typeof tooltipData.calculatedTrend === 'number') {
-                                                    return `${tooltipData.calculatedTrend.toFixed(2)}%`;
-                                                }
-                                                return 'N/A';
+                                                // If no stored trend, show N/A (don't calculate on-the-fly)
+                                                return 'N/A (trend not calculated yet)';
                                             })()}
                                         </div>
                                     </div>

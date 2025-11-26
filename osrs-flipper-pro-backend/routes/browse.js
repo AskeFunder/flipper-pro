@@ -27,7 +27,7 @@ router.get("/browse", async (req, res) => {
             "volume_5m", "volume_1h", "volume_6h", "volume_24h", "volume_7d",
             "turnover_5m", "turnover_1h", "turnover_6h", "turnover_24h", "turnover_7d", "turnover_1m",
             "buy_sell_rate_5m", "buy_sell_rate_1h",
-            "trend_5m", "trend_1h", "trend_6h", "trend_24h", "trend_7d", "trend_1m"
+            "trend_5m", "trend_1h", "trend_6h", "trend_24h", "trend_1w", "trend_1m"
         ]);
 
         // Map frontend column names to database column names
@@ -104,8 +104,8 @@ router.get("/browse", async (req, res) => {
             maxTrend_6h: "trend_6h",
             minTrend_24h: "trend_24h",
             maxTrend_24h: "trend_24h",
-            minTrend_7d: "trend_7d",
-            maxTrend_7d: "trend_7d",
+            minTrend_1w: "trend_1w",
+            maxTrend_1w: "trend_1w",
             minTrend_1m: "trend_1m",
             maxTrend_1m: "trend_1m",
             minLimit: "limit",
@@ -178,7 +178,7 @@ router.get("/browse", async (req, res) => {
             "trend_1h",
             "trend_6h",
             "trend_24h",
-            "trend_7d",
+            "trend_1w",
             "trend_1m"
         ];
 

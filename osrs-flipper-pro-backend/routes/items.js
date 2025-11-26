@@ -191,7 +191,7 @@ router.get("/latest-table", async (req, res) => {
             // volume
             "volume_5m", "volume_1h", "volume_6h", "volume_24h", "volume_7d",
             // trend
-            "trend_5m", "trend_1h", "trend_6h", "trend_24h", "trend_7d", "trend_1m",
+            "trend_5m", "trend_1h", "trend_6h", "trend_24h", "trend_1w", "trend_1m",
             // turnover
             "turnover_5m", "turnover_1h", "turnover_6h", "turnover_24h", "turnover_7d", "turnover_1m",
             // buy/sell rate
