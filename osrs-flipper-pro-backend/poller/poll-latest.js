@@ -137,10 +137,17 @@ async function pollLatest() {
                     WHERE price_instants.timestamp IS DISTINCT FROM EXCLUDED.timestamp;
                 `, [itemId, entry.high, entry.highTime, now]);
                 
-                // rowCount = 1: INSERT or UPDATE happened
+                // rowCount = 1: INSERT or UPDATE happened (timestamp changed)
                 // rowCount = 0: Row exists but WHERE clause prevented UPDATE (dedupe working)
                 if (result.rowCount > 0) {
                     rowsUpdated++;
+                    // Mark item as dirty only when timestamp update actually happened
+                    await db.query(`
+                        INSERT INTO dirty_items (item_id, touched_at)
+                        VALUES ($1, $2)
+                        ON CONFLICT (item_id) DO UPDATE SET
+                            touched_at = EXCLUDED.touched_at
+                    `, [itemId, now]);
                 } else {
                     rowsSkipped++;
                 }
@@ -163,10 +170,17 @@ async function pollLatest() {
                     WHERE price_instants.timestamp IS DISTINCT FROM EXCLUDED.timestamp;
                 `, [itemId, entry.low, entry.lowTime, now]);
                 
-                // rowCount = 1: INSERT or UPDATE happened
+                // rowCount = 1: INSERT or UPDATE happened (timestamp changed)
                 // rowCount = 0: Row exists but WHERE clause prevented UPDATE (dedupe working)
                 if (result.rowCount > 0) {
                     rowsUpdated++;
+                    // Mark item as dirty only when timestamp update actually happened
+                    await db.query(`
+                        INSERT INTO dirty_items (item_id, touched_at)
+                        VALUES ($1, $2)
+                        ON CONFLICT (item_id) DO UPDATE SET
+                            touched_at = EXCLUDED.touched_at
+                    `, [itemId, now]);
                 } else {
                     rowsSkipped++;
                 }
@@ -180,6 +194,13 @@ async function pollLatest() {
         }
 
         await db.query("COMMIT");
+        
+        // Get dirty items count for visibility
+        const { rows: dirtyCount } = await db.query(`
+            SELECT COUNT(*)::INT AS count FROM dirty_items
+        `);
+        console.log(`[DIRTY] ${dirtyCount[0].count} items currently marked dirty`);
+        
         const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
         const itemCount = Object.keys(data).length;
         const itemsPerSec = (itemCount / parseFloat(elapsedTime)).toFixed(0);
