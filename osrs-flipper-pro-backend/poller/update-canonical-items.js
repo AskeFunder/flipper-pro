@@ -137,6 +137,7 @@ function buildEISExpression(tableName, targetParam, windowStartParam, windowEndP
  * @returns {Promise<Map<number, Object>>} - Map of itemId -> {trend_5m, trend_1h, trend_6h, trend_24h, trend_7d, trend_1m, trend_3m, trend_1y}
  */
 async function calculateBatchTrends(itemIds, now) {
+    const startTime = Date.now();
     if (itemIds.length === 0) return new Map();
     
     // Trend window definitions (in seconds)
@@ -386,6 +387,11 @@ async function calculateBatchTrends(itemIds, now) {
         trendMap.set(itemId, trends);
     }
     
+    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    const itemCount = itemIds.length;
+    const itemsPerSec = (itemCount / parseFloat(elapsedTime)).toFixed(0);
+    console.log(`[PERF] calculateBatchTrends: ${itemCount} items in ${elapsedTime}s → ${itemsPerSec}/sec`);
+    
     return trendMap;
 }
 
@@ -399,6 +405,7 @@ async function updateCanonicalItems() {
     }
     
     try {
+        const startTime = Date.now();
         createLock("canonical");
         setupLockCleanup("canonical");
         console.log("[CANONICAL] Starting update...");
@@ -779,7 +786,11 @@ async function updateCanonicalItems() {
             }
         }
         
+        const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        const itemCount = items.length;
+        const itemsPerSec = (itemCount / parseFloat(elapsedTime)).toFixed(0);
         console.log(`[CANONICAL] Updated ${updated} items`);
+        console.log(`[PERF] canonical: ${itemCount} items in ${elapsedTime}s → ${itemsPerSec}/sec`);
     } catch (err) {
         console.error("[CANONICAL] Error updating canonical items:", err);
         throw err;
