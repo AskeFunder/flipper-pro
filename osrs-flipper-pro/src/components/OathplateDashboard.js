@@ -13,6 +13,7 @@ import {
     Tooltip,
 } from "chart.js";
 import 'chartjs-adapter-date-fns';
+import { timeAgo, formatPriceFull } from "../utils/formatting";
 
 ChartJS.register(
     LineElement,
@@ -357,14 +358,15 @@ export default function OathplateDashboard() {
             )}
 
             <h3>Recent Trades</h3>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                    <tr>
-                        <th align="left">Time</th>
-                        <th align="left">Type</th>
-                        <th align="left">Price</th>
-                    </tr>
-                </thead>
+            <div style={{ overflowX: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)' }}>
+                    <thead>
+                        <tr>
+                            <th align="left" style={{ padding: "8px 6px", whiteSpace: "nowrap", width: "35%" }}>Time</th>
+                            <th align="left" style={{ padding: "8px 6px", whiteSpace: "nowrap", width: "15%" }}>Type</th>
+                            <th align="left" style={{ padding: "8px 6px", whiteSpace: "nowrap", width: "50%" }}>Price</th>
+                        </tr>
+                    </thead>
                 <tbody>
                     {recentTrades.map((t, i) => {
                         const isBuy = t.type === 'buy';
@@ -373,14 +375,15 @@ export default function OathplateDashboard() {
                         const textColor = isBuy ? '#007a00' : '#b20000';
                         return (
                             <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
-                                <td>{new Date(t.ts * 1000).toLocaleTimeString()}</td>
-                                <td>{label}</td>
-                                <td>{t.price.toLocaleString()} gp</td>
+                                <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{timeAgo(t.ts)}</td>
+                                <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{label}</td>
+                                <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{formatPriceFull(t.price)}</td>
                             </tr>
                         );
                     })}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }

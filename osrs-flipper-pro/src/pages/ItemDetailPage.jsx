@@ -481,13 +481,13 @@ export default function ItemDetailPage() {
                     {/* Recent Trades - 20% width */}
                     <div style={{ flex: '0 0 20%', width: '20%' }}>
                         <h2 style={sectionTitleStyle}>Recent Trades</h2>
-                        <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <div style={{ maxHeight: '60vh', overflowY: 'auto', overflowX: 'hidden' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)' }}>
                                 <thead>
                                     <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-                                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Time</th>
-                                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Type</th>
-                                        <th align="left" style={{ padding: "12px", textAlign: "left" }}>Price</th>
+                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "35%" }}>Time</th>
+                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "15%" }}>Type</th>
+                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "50%" }}>Price</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -508,9 +508,9 @@ export default function ItemDetailPage() {
                                             const textColor = isBuy ? '#007a00' : '#b20000';
                                             return (
                                                 <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
-                                                    <td style={{ padding: "10px 12px" }}>{new Date(t.ts * 1000).toLocaleTimeString()}</td>
-                                                    <td style={{ padding: "10px 12px" }}>{label}</td>
-                                                    <td style={{ padding: "10px 12px" }}>{t.price.toLocaleString()} gp</td>
+                                                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{timeAgo(t.ts)}</td>
+                                                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{label}</td>
+                                                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{formatPriceFull(t.price)}</td>
                                                 </tr>
                                             );
                                         })

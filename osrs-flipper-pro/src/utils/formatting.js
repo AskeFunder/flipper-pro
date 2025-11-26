@@ -60,10 +60,41 @@ export function formatRoi(n) {
 
 export function timeAgo(unix) {
     if (!unix) return "-";
-    const s = Math.floor(Date.now() / 1000 - unix);
-    if (s < 60) return `${s}s ago`;
-    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-    return `${Math.floor(s / 3600)}h ago`;
+    const now = Math.floor(Date.now() / 1000);
+    const diffSeconds = now - unix;
+    
+    if (diffSeconds < 60) {
+        return `${diffSeconds}s ago`;
+    }
+    
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) {
+        return `${diffMinutes}m ago`;
+    }
+    
+    const diffHours = Math.floor(diffSeconds / 3600);
+    const remainingMinutes = Math.floor((diffSeconds % 3600) / 60);
+    
+    if (diffHours < 24) {
+        if (remainingMinutes === 0) {
+            return `${diffHours}h ago`;
+        }
+        return `${diffHours}h ${remainingMinutes}m ago`;
+    }
+    
+    const diffDays = Math.floor(diffHours / 24);
+    const remainingHours = diffHours % 24;
+    const finalRemainingMinutes = Math.floor((diffSeconds % 86400) % 3600 / 60);
+    
+    if (remainingHours === 0 && finalRemainingMinutes === 0) {
+        return `${diffDays}d ago`;
+    }
+    
+    // For days, show days and hours, skip minutes to keep it shorter
+    if (remainingHours === 0) {
+        return `${diffDays}d ago`;
+    }
+    return `${diffDays}d ${remainingHours}h ago`;
 }
 
 /**
