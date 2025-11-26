@@ -410,12 +410,36 @@ async function updateCanonicalItems() {
         setupLockCleanup("canonical");
         console.log("[CANONICAL] Starting update...");
         
-        // Get all items
-        const { rows: items } = await db.query("SELECT id, name, icon, members, \"limit\" FROM items");
+        // Get only items that need updates (from dirty_items queue)
+        const { rows: items } = await db.query(`
+            SELECT i.id, i.name, i.icon, i.members, i."limit"
+            FROM dirty_items d
+            JOIN items i ON i.id = d.item_id
+        `);
         
         if (items.length === 0) {
-            console.log("[CANONICAL] No items found, skipping update");
+            console.log("[CANONICAL] No dirty items found, skipping update");
             return;
+        }
+        
+        // Fetch total item count for adaptive fallback
+        const { rows: totalRows } = await db.query(`
+            SELECT COUNT(*)::INT AS count FROM items
+        `);
+        const totalItems = totalRows[0].count;
+        
+        // Adaptive fallback: only switch to full refresh if dirty backlog is almost everything
+        if (items.length > totalItems * 0.8) {
+            console.log(
+                `[CANONICAL] Dirty backlog ${items.length}/${totalItems} (>80%) — switching to full refresh`
+            );
+            
+            const full = await db.query(
+                `SELECT id, name, icon, members, "limit" FROM items`
+            );
+            
+            items.length = 0;
+            items.push(...full.rows);
         }
         
         let updated = 0;
@@ -711,6 +735,13 @@ async function updateCanonicalItems() {
                 
                 if (values.length === 0) {
                     await db.query("COMMIT");
+                    
+                    // Clear dirty_items for batch even if no values to update
+                    await db.query(`
+                        DELETE FROM dirty_items
+                        WHERE item_id = ANY($1)
+                    `, [itemIds]);
+                    
                     continue;
                 }
                 
@@ -779,6 +810,13 @@ async function updateCanonicalItems() {
                 updated += values.length;
                 
                 await db.query("COMMIT");
+                
+                // Clear dirty_items for successfully processed items
+                await db.query(`
+                    DELETE FROM dirty_items
+                    WHERE item_id = ANY($1)
+                `, [itemIds]);
+                
                 console.log(`[CANONICAL] Batch ${batchNum}/${totalBatches} completed (${updated} items updated so far)`);
             } catch (err) {
                 await db.query("ROLLBACK");
