@@ -1,4 +1,10 @@
 const { exec } = require("child_process");
+const { Pool } = require("pg");
+require("dotenv").config();
+
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL
+});
 
 let lastPollTimestamp = null;
 let lastBackfillMinute = null;
@@ -7,6 +13,7 @@ let lastBackfill_6h = null;
 let lastBackfill_24h = null;
 let lastLatestPollSecond = null;
 let lastLatestCleanupMinute = null;
+let lastCanonicalUpdateTime = null;
 
 function run(cmd, label) {
     const time = new Date().toISOString();
@@ -24,6 +31,53 @@ function run(cmd, label) {
     });
 }
 
+/**
+ * Get canonical update frequency in seconds based on dirty items count
+ * @param {number} dirtyCount - Number of items in dirty_items queue
+ * @returns {number} Frequency in seconds
+ */
+function getCanonicalFrequency(dirtyCount) {
+    if (dirtyCount === 0) {
+        return 60; // Every 60s
+    } else if (dirtyCount <= 200) {
+        return 30; // Every 30s
+    } else if (dirtyCount <= 1000) {
+        return 15; // Every 15s
+    } else {
+        return 0; // Immediate
+    }
+}
+
+/**
+ * Check if canonical update should run based on dynamic frequency
+ */
+async function checkCanonicalUpdate() {
+    try {
+        const { rows } = await db.query(`
+            SELECT COUNT(*)::INT AS count FROM dirty_items
+        `);
+        const dirtyCount = rows[0].count;
+        const frequency = getCanonicalFrequency(dirtyCount);
+        
+        const now = Date.now();
+        const timeSinceLastUpdate = lastCanonicalUpdateTime ? (now - lastCanonicalUpdateTime) / 1000 : Infinity;
+        
+        // Immediate if > 1000 dirty items
+        if (frequency === 0 || timeSinceLastUpdate >= frequency) {
+            lastCanonicalUpdateTime = now;
+            run("node poller/update-canonical-items.js", "UPDATE CANONICAL");
+            
+            if (frequency === 0) {
+                console.log(`[SCHEDULER] Canonical: Immediate (${dirtyCount} dirty items)`);
+            } else {
+                console.log(`[SCHEDULER] Canonical: ${frequency}s frequency (${dirtyCount} dirty items)`);
+            }
+        }
+    } catch (err) {
+        console.error("[SCHEDULER] Error checking canonical update:", err.message);
+    }
+}
+
 function tick() {
     const now = new Date();
     const hours = now.getUTCHours();
@@ -37,11 +91,13 @@ function tick() {
     if (seconds % 15 === 0 && lastLatestPollSecond !== seconds) {
         lastLatestPollSecond = seconds;
         run("node poller/poll-latest.js", "POLL LATEST");
-        // Update canonical items after latest poll (with small delay to ensure data is committed)
-        setTimeout(() => {
-            run("node poller/update-canonical-items.js", "UPDATE CANONICAL");
-        }, 2000);
+        // Canonical update now uses dynamic frequency based on dirty queue size
+        // Check will happen in the main tick loop
     }
+    
+    // --- Dynamic canonical update based on dirty queue size ---
+    // Check every second to support immediate updates for >1000 dirty items
+    checkCanonicalUpdate();
 
     // --- Cleanup all (granularities + latest) every 10 minutes at :01 ---
     if (minutes % 10 === 1 && seconds === 0 && lastLatestCleanupMinute !== minutes) {

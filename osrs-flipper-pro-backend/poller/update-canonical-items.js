@@ -417,8 +417,9 @@ async function updateCanonicalItems() {
             JOIN items i ON i.id = d.item_id
         `);
         
+        // Auto-skip when no dirty items (eliminates unnecessary cron-triggered work)
         if (items.length === 0) {
-            console.log("[CANONICAL] No dirty items found, skipping update");
+            console.log("[CANONICAL] No dirty items — skipping update");
             return;
         }
         
@@ -444,9 +445,21 @@ async function updateCanonicalItems() {
         
         let updated = 0;
         
-        // Process in batches to avoid memory issues
-        // Increased to 200 for better performance with window-based trends
-        const batchSize = 200;
+        // Adaptive batch size based on dirty items count
+        // Lowers latency when few items change, preserves throughput on bursts
+        let batchSize;
+        if (items.length <= 50) {
+            batchSize = 25;
+        } else if (items.length <= 300) {
+            batchSize = 50;
+        } else if (items.length <= 1200) {
+            batchSize = 100;
+        } else {
+            batchSize = 200;
+        }
+        
+        console.log(`[CANONICAL] Adaptive batch size: ${batchSize} (${items.length} dirty items)`);
+        
         const totalBatches = Math.ceil(items.length / batchSize);
         for (let i = 0; i < items.length; i += batchSize) {
             const batch = items.slice(i, i + batchSize);
