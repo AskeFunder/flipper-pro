@@ -2,13 +2,15 @@
 module.exports = [
     {
         id: "margin",
-        sql: `(FLOOR(high.price * 0.98) - low.price) AS margin`,
-        filterExpr: `(FLOOR(high.price * 0.98) - low.price)`
+        // Tax is 2% of high price, rounded down to nearest whole number
+        sql: `(high.price - FLOOR(high.price * 0.02) - low.price) AS margin`,
+        filterExpr: `(high.price - FLOOR(high.price * 0.02) - low.price)`
     },
     {
         id: "roi",
-        sql: `ROUND((FLOOR(high.price * 0.98) - low.price) * 100.0 / NULLIF(low.price,0), 2) AS roi`,
-        filterExpr: `ROUND((FLOOR(high.price * 0.98) - low.price) * 100.0 / NULLIF(low.price,0), 2)`
+        // Tax is 2% of high price, rounded down to nearest whole number
+        sql: `ROUND((high.price - FLOOR(high.price * 0.02) - low.price) * 100.0 / NULLIF(low.price,0), 2) AS roi`,
+        filterExpr: `ROUND((high.price - FLOOR(high.price * 0.02) - low.price) * 100.0 / NULLIF(low.price,0), 2)`
     },
     {
         id: "spread",
@@ -17,8 +19,9 @@ module.exports = [
     },
     {
         id: "max_profit",
-        sql: `(CAST((FLOOR(high.price * 0.98) - low.price) AS BIGINT)) * COALESCE(i.limit::BIGINT,0) AS max_profit`,
-        filterExpr: `(CAST((FLOOR(high.price * 0.98) - low.price) AS BIGINT)) * COALESCE(i.limit::BIGINT,0)`
+        // Tax is 2% of high price, rounded down to nearest whole number
+        sql: `(CAST((high.price - FLOOR(high.price * 0.02) - low.price) AS BIGINT)) * COALESCE(i.limit::BIGINT,0) AS max_profit`,
+        filterExpr: `(CAST((high.price - FLOOR(high.price * 0.02) - low.price) AS BIGINT)) * COALESCE(i.limit::BIGINT,0)`
     },
     {
         id: "max_investment",

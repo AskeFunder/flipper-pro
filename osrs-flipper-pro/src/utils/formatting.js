@@ -53,7 +53,11 @@ export function formatColoredNumber(n) {
 
 export function formatRoi(n) {
     const val = typeof n === "string" ? parseFloat(n) : n;
-    if (val == null || Math.abs(val) < 0.001 || isNaN(val)) return "-";
+    if (val == null || isNaN(val)) return "-";
+    // Always show 0, even if it's exactly 0
+    if (val === 0 || Math.abs(val) < 0.001) {
+        return <span style={{ fontFamily: "monospace" }}>0.00%</span>;
+    }
     const color = val > 0 ? "#16a34a" : "#dc2626";
     return <span style={{ color, fontFamily: "monospace" }}>{val.toFixed(2)}%</span>;
 }

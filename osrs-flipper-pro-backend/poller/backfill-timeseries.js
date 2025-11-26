@@ -117,6 +117,9 @@ async function backfill(timestep = "5m") {
             try {
                 await db.query("BEGIN");
 
+                // For 5m granularity, add 5 minutes (300 seconds) to timestamp to represent end of window
+                const adjustedTs = timestep === "5m" ? ts + 300 : ts;
+
                 for (const itemId of allItemIds) {
                     const itemData = apiData[itemId] || {};
 
@@ -129,7 +132,7 @@ async function backfill(timestep = "5m") {
                         `INSERT INTO ${cfg.table} (item_id, timestamp, avg_high, avg_low, high_volume, low_volume)
                          VALUES ($1, $2, $3, $4, $5, $6)
                          ON CONFLICT (item_id, timestamp) DO NOTHING`,
-                        [itemId, ts, avgHigh, avgLow, highVol, lowVol]
+                        [itemId, adjustedTs, avgHigh, avgLow, highVol, lowVol]
                     );
                     insertedTotal++;
                 }

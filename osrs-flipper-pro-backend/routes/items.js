@@ -4,6 +4,7 @@ const db = require("../db/db");
 const selectColumns = require("../queries/selectColumns");
 const buildFilters = require("../queries/buildFilters");
 const buildJoins = require("../queries/buildJoins");
+const { getTrendDetails } = require("./trend-details");
 
 // Test endpoint to verify routing works
 router.get("/test", (req, res) => {
@@ -309,6 +310,23 @@ router.get("/latest-table", async (req, res) => {
             error: "Failed to fetch data",
             detail: err.message
         });
+    }
+});
+
+// GET /api/items/trend-details/:id - Returns detailed trend calculation information
+router.get("/trend-details/:id", async (req, res) => {
+    const itemId = parseInt(req.params.id, 10);
+    
+    if (isNaN(itemId)) {
+        return res.status(400).json({ error: "Invalid item ID" });
+    }
+    
+    try {
+        const details = await getTrendDetails(itemId);
+        return res.json(details);
+    } catch (err) {
+        console.error(`[GET /items/trend-details/${itemId}] Error:`, err);
+        return res.status(500).json({ error: "Database error", detail: err.message });
     }
 });
 

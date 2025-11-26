@@ -21,6 +21,7 @@ import {
     formatRoi,
     timeAgo,
 } from "../utils/formatting";
+import { taxExemptItems } from "../config/taxExemptItems";
 
 ChartJS.register(
     LineElement,
@@ -353,7 +354,10 @@ export default function ItemDetailPage() {
                     const limit = canonicalData.limit || null; // From items table (via canonical_items)
                     
                     if (high != null && low != null) {
-                        margin = Math.floor(high * 0.98) - low;
+                        // Tax is 2% of high price, rounded down to nearest whole number (unless item is tax-exempt)
+                        const isTaxExempt = canonicalData.name && taxExemptItems.has(canonicalData.name);
+                        const tax = isTaxExempt ? 0 : Math.floor(high * 0.02);
+                        margin = high - tax - low;
                         roi_percent = low > 0 ? (margin / low) * 100 : 0;
                         spread_percent = high > 0 ? ((high - low) / high) * 100 : 0;
                         max_profit = margin * (limit || 0);
@@ -1507,9 +1511,11 @@ export default function ItemDetailPage() {
                         label={`Turnover (${selectedGranularity})`} 
                         value={granularityMetrics.turnover != null ? formatCompact(granularityMetrics.turnover) : "–"} 
                     />
-                    <Field 
+                    <TrendField 
                         label={`Trend (${selectedGranularity})`} 
-                        value={formatRoi(granularityMetrics.trend)} 
+                        value={formatRoi(granularityMetrics.trend)}
+                        itemId={canonicalData?.item_id}
+                        granularity={selectedGranularity}
                     />
                     {granularityMetrics.buy_sell_rate != null && (
                         <Field 
@@ -1565,6 +1571,159 @@ function Field({ label, value }) {
         <div style={fieldStyle}>
             <div style={labelStyle}>{label}</div>
             <div style={valueStyle}>{value}</div>
+        </div>
+    );
+}
+
+// TrendField component with hover tooltip showing calculation details
+function TrendField({ label, value, itemId, granularity }) {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipData, setTooltipData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const tooltipRef = useRef(null);
+
+    const handleMouseEnter = async () => {
+        if (!itemId || !granularity) return;
+        
+        setShowTooltip(true);
+        setLoading(true);
+        
+        try {
+            // Map granularity to trend key
+            const trendKey = granularity === '7d' ? 'trend_7d' : 
+                           granularity === '1m' ? 'trend_1m' :
+                           `trend_${granularity}`;
+            
+            const res = await fetch(`${API_BASE}/api/items/trend-details/${itemId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setTooltipData(data[trendKey] || null);
+            } else {
+                console.error("TrendField: API error", res.status);
+            }
+        } catch (err) {
+            console.error("TrendField: Error fetching trend details:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        setShowTooltip(false);
+        setTooltipData(null);
+    };
+
+    const formatPrice = (price) => {
+        if (price == null) return "N/A";
+        return price.toLocaleString();
+    };
+
+    const formatTime = (timestamp) => {
+        if (!timestamp) return "N/A";
+        return new Date(timestamp * 1000).toLocaleString();
+    };
+
+    return (
+        <div 
+            style={{ ...fieldStyle, position: 'relative' }}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+            <div style={labelStyle}>{label}</div>
+            <div style={valueStyle}>{value}</div>
+            {showTooltip && (
+                <div 
+                    ref={tooltipRef}
+                    style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        marginBottom: '8px',
+                        backgroundColor: '#1f2937',
+                        color: '#fff',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        minWidth: '300px',
+                        maxWidth: '400px',
+                        zIndex: 1000,
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+                        pointerEvents: 'none',
+                    }}
+                >
+                    {loading ? (
+                        <div>Loading calculation details...</div>
+                    ) : tooltipData ? (
+                        <div>
+                            <div style={{ fontWeight: 600, marginBottom: '8px', borderBottom: '1px solid #374151', paddingBottom: '4px' }}>
+                                Trend Calculation
+                            </div>
+                            {tooltipData.current && tooltipData.previous ? (
+                                <>
+                                    <div style={{ marginBottom: '8px' }}>
+                                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>Current Price:</div>
+                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#d1d5db' }}>
+                                            Mid: {formatPrice(tooltipData.current.mid)} gp
+                                            {tooltipData.current.avg_high && tooltipData.current.avg_low && (
+                                                <span> (High: {formatPrice(tooltipData.current.avg_high)}, Low: {formatPrice(tooltipData.current.avg_low)})</span>
+                                            )}
+                                            <br />
+                                            Time: {formatTime(tooltipData.current.timestamp)}
+                                            <br />
+                                            Source: {tooltipData.current.table}
+                                        </div>
+                                    </div>
+                                    <div style={{ marginBottom: '8px' }}>
+                                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>Previous Price:</div>
+                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#d1d5db' }}>
+                                            Mid: {formatPrice(tooltipData.previous.mid)} gp
+                                            {tooltipData.previous.avg_high && tooltipData.previous.avg_low && (
+                                                <span> (High: {formatPrice(tooltipData.previous.avg_high)}, Low: {formatPrice(tooltipData.previous.avg_low)})</span>
+                                            )}
+                                            <br />
+                                            Time: {formatTime(tooltipData.previous.timestamp)}
+                                            <br />
+                                            Source: {tooltipData.previous.table}
+                                        </div>
+                                    </div>
+                                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #374151' }}>
+                                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>Calculation:</div>
+                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#d1d5db', fontFamily: 'monospace' }}>
+                                            (({formatPrice(tooltipData.current.mid)} - {formatPrice(tooltipData.previous.mid)}) / {formatPrice(tooltipData.previous.mid)}) × 100
+                                            <br />
+                                            = {(() => {
+                                                // Calculate trend from current and previous prices
+                                                if (tooltipData.current && tooltipData.previous && 
+                                                    tooltipData.current.mid != null && tooltipData.previous.mid != null && 
+                                                    tooltipData.previous.mid !== 0) {
+                                                    const calculated = ((tooltipData.current.mid - tooltipData.previous.mid) / tooltipData.previous.mid) * 100;
+                                                    return `${calculated.toFixed(2)}%`;
+                                                }
+                                                // Fallback to stored trend value if available
+                                                if (tooltipData.trend != null && typeof tooltipData.trend === 'number') {
+                                                    return `${tooltipData.trend.toFixed(2)}%`;
+                                                }
+                                                // Fallback to calculatedTrend if available
+                                                if (tooltipData.calculatedTrend != null && typeof tooltipData.calculatedTrend === 'number') {
+                                                    return `${tooltipData.calculatedTrend.toFixed(2)}%`;
+                                                }
+                                                return 'N/A';
+                                            })()}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ color: '#9ca3af' }}>
+                                    Insufficient data to calculate trend
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div>No trend data available</div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

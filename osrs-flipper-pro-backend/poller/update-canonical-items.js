@@ -1,5 +1,6 @@
 const db = require("../db/db");
 const { isBackfillRunning, createLock, removeLock, setupLockCleanup } = require("./lock-utils");
+const taxExemptItems = require("../config/tax-exempt-items");
 
 /**
  * Find price data for a target timestamp using multi-granularity fallback with tolerance scanning
@@ -233,6 +234,8 @@ async function calculateBatchTrends(itemIds, now) {
             
             if (isExact) {
                 // Exact match for 5m
+                // For 'start' type, use ASC to get first point; for 'end' type, use DESC to get latest
+                const timestampOrder = target.type === 'start' ? 'ASC' : 'DESC';
                 query = `
                     SELECT DISTINCT ON (item_id)
                         item_id,
@@ -243,13 +246,15 @@ async function calculateBatchTrends(itemIds, now) {
                     WHERE item_id = ANY($1)
                       AND timestamp = $2
                       AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
-                    ORDER BY item_id, priority ASC, timestamp DESC
+                    ORDER BY item_id, priority ASC, timestamp ${timestampOrder}
                 `;
                 params = [itemIds, target.timestamp];
             } else if (isStrict) {
                 // Strict window (1y only)
                 const windowStart = now - target.window.length;
                 const windowEnd = now;
+                // For 'start' type, use ASC to get first point in window; for 'end' type, use DESC to get latest
+                const timestampOrder = target.type === 'start' ? 'ASC' : 'DESC';
                 query = `
                     SELECT DISTINCT ON (item_id)
                         item_id,
@@ -262,11 +267,13 @@ async function calculateBatchTrends(itemIds, now) {
                       AND timestamp <= $3
                       AND ABS(timestamp - $4) <= $5
                       AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
-                    ORDER BY item_id, priority ASC, ABS(timestamp - $4) ASC, timestamp DESC
+                    ORDER BY item_id, priority ASC, ABS(timestamp - $4) ASC, timestamp ${timestampOrder}
                 `;
                 params = [itemIds, windowStart, windowEnd, target.timestamp, tolerance];
             } else {
                 // Tolerance-based search
+                // For 'start' type, use ASC to get first point in window; for 'end' type, use DESC to get latest
+                const timestampOrder = target.type === 'start' ? 'ASC' : 'DESC';
                 query = `
                     SELECT DISTINCT ON (item_id)
                         item_id,
@@ -277,7 +284,7 @@ async function calculateBatchTrends(itemIds, now) {
                     WHERE item_id = ANY($1)
                       AND ABS(timestamp - $2) <= $3
                       AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
-                    ORDER BY item_id, priority ASC, ABS(timestamp - $2) ASC, timestamp DESC
+                    ORDER BY item_id, priority ASC, ABS(timestamp - $2) ASC, timestamp ${timestampOrder}
                 `;
                 params = [itemIds, target.timestamp, tolerance];
             }
@@ -328,6 +335,8 @@ async function calculateBatchTrends(itemIds, now) {
             const windowEnd = now;
             const maxExtended = Math.floor(target.window.length * 0.20);
             
+            // For 'start' type, use ASC to get first point in window; for 'end' type, use DESC to get latest
+            const timestampOrder = target.type === 'start' ? 'ASC' : 'DESC';
             const eisQuery = `
                 SELECT DISTINCT ON (item_id)
                     item_id,
@@ -340,7 +349,7 @@ async function calculateBatchTrends(itemIds, now) {
                   AND timestamp <= $3
                   AND ABS(timestamp - $4) <= $5
                   AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
-                ORDER BY item_id, priority ASC, ABS(timestamp - $4) ASC, timestamp DESC
+                ORDER BY item_id, priority ASC, ABS(timestamp - $4) ASC, timestamp ${timestampOrder}
             `;
             const eisParams = [missingIds, windowStart, windowEnd, target.timestamp, maxExtended];
             
@@ -492,7 +501,7 @@ async function updateCanonicalItems() {
                 }
                 
                 // 2. Fetch all volumes for the batch in parallel
-                const [vol5mRows, vol1hRows, vol6hRows, vol24hRows, vol7dRows] = await Promise.all([
+                const [vol5mRows, vol1hRows, vol6hRows, vol24hRows, vol7dRows, vol1mRows] = await Promise.all([
                     // Volume 5m (latest)
                     db.query(`
                         SELECT DISTINCT ON (item_id) item_id, volume
@@ -527,7 +536,14 @@ async function updateCanonicalItems() {
                         FROM price_1h
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
-                    `, [itemIds, now - 604800])
+                    `, [itemIds, now - 604800]),
+                    // Volume 1m
+                    db.query(`
+                        SELECT item_id, COALESCE(SUM(volume), 0)::BIGINT AS volume
+                        FROM price_6h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 2592000])
                 ]);
                 
                 // Organize volumes by item_id
@@ -551,6 +567,10 @@ async function updateCanonicalItems() {
                 for (const row of vol7dRows.rows) {
                     if (!volumesByItem.has(row.item_id)) volumesByItem.set(row.item_id, {});
                     volumesByItem.get(row.item_id).vol7d = row.volume || 0;
+                }
+                for (const row of vol1mRows.rows) {
+                    if (!volumesByItem.has(row.item_id)) volumesByItem.set(row.item_id, {});
+                    volumesByItem.get(row.item_id).vol1m = row.volume || 0;
                 }
                 
                 // 3. Fetch all prices from aggregated tables
@@ -719,7 +739,10 @@ async function updateCanonicalItems() {
                     const lowTs = prices.low.timestamp;
                     
                     // Calculate derived values
-                    const margin = Math.floor(high * 0.98) - low;
+                    // Tax is 2% of high price, rounded down to nearest whole number (unless item is tax-exempt)
+                    const isTaxExempt = item.name && taxExemptItems.has(item.name);
+                    const tax = isTaxExempt ? 0 : Math.floor(high * 0.02);
+                    const margin = high - tax - low;
                     const roiPercent = low > 0 ? parseFloat(((margin * 100.0) / low).toFixed(2)) : null;
                     const spreadPercent = high > 0 ? parseFloat(((high - low) * 100.0 / high).toFixed(2)) : null;
                     const maxProfit = (BigInt(margin) * BigInt(item.limit || 0)).toString();
@@ -736,7 +759,7 @@ async function updateCanonicalItems() {
                         itemId, item.name, item.icon, item.members, item.limit,
                         high, low, highTs, lowTs,
                         margin, roiPercent, spreadPercent, maxProfit, maxInvestment,
-                        vols.vol5m ?? null, vols.vol1h ?? 0, vols.vol6h ?? 0, vols.vol24h ?? 0, vols.vol7d ?? 0,
+                        vols.vol5m ?? null, vols.vol1h ?? 0, vols.vol6h ?? 0, vols.vol24h ?? 0, vols.vol7d ?? 0, vols.vol1m ?? 0,
                         pricesAgg.price5mHigh ?? null, pricesAgg.price5mLow ?? null, pricesAgg.price1hHigh ?? null, pricesAgg.price1hLow ?? null,
                         turnovers.turnover5m ?? '0', turnovers.turnover1h ?? '0', turnovers.turnover6h ?? '0', turnovers.turnover24h ?? '0', turnovers.turnover7d ?? '0', turnovers.turnover1m ?? '0',
                         bsr.bsr5m ?? null, bsr.bsr1h ?? null,
@@ -760,8 +783,8 @@ async function updateCanonicalItems() {
                 
                 // Bulk INSERT/UPDATE using unnest (PostgreSQL efficient bulk operation)
                 const placeholders = values.map((_, i) => {
-                    const base = i * 40;
-                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14}, $${base + 15}, $${base + 16}, $${base + 17}, $${base + 18}, $${base + 19}, $${base + 20}, $${base + 21}, $${base + 22}, $${base + 23}, $${base + 24}, $${base + 25}, $${base + 26}, $${base + 27}, $${base + 28}, $${base + 29}, $${base + 30}, $${base + 31}, $${base + 32}, $${base + 33}, $${base + 34}, $${base + 35}, $${base + 36}, $${base + 37}, $${base + 38}, $${base + 39}, $${base + 40})`;
+                    const base = i * 41;
+                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14}, $${base + 15}, $${base + 16}, $${base + 17}, $${base + 18}, $${base + 19}, $${base + 20}, $${base + 21}, $${base + 22}, $${base + 23}, $${base + 24}, $${base + 25}, $${base + 26}, $${base + 27}, $${base + 28}, $${base + 29}, $${base + 30}, $${base + 31}, $${base + 32}, $${base + 33}, $${base + 34}, $${base + 35}, $${base + 36}, $${base + 37}, $${base + 38}, $${base + 39}, $${base + 40}, $${base + 41})`;
                 }).join(', ');
                 
                 const flatParams = values.flat();
@@ -771,7 +794,7 @@ async function updateCanonicalItems() {
                         item_id, name, icon, members, "limit",
                         high, low, high_timestamp, low_timestamp,
                         margin, roi_percent, spread_percent, max_profit, max_investment,
-                        volume_5m, volume_1h, volume_6h, volume_24h, volume_7d,
+                        volume_5m, volume_1h, volume_6h, volume_24h, volume_7d, volume_1m,
                         price_5m_high, price_5m_low, price_1h_high, price_1h_low,
                         turnover_5m, turnover_1h, turnover_6h, turnover_24h, turnover_7d, turnover_1m,
                         buy_sell_rate_5m, buy_sell_rate_1h,
@@ -797,6 +820,7 @@ async function updateCanonicalItems() {
                         volume_6h = EXCLUDED.volume_6h,
                         volume_24h = EXCLUDED.volume_24h,
                         volume_7d = EXCLUDED.volume_7d,
+                        volume_1m = EXCLUDED.volume_1m,
                         price_5m_high = EXCLUDED.price_5m_high,
                         price_5m_low = EXCLUDED.price_5m_low,
                         price_1h_high = EXCLUDED.price_1h_high,

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db/db');
+const taxExemptItems = require('../config/tax-exempt-items');
 
 // ─── Trend Helpers ─────────────────────────────────────────────────────────────
 function calcTrend(curr, prev) {
@@ -43,12 +44,17 @@ async function getTrendRange(table, itemId, seconds) {
 router.get('/latest/:id', async (req, res) => {
     const itemId = parseInt(req.params.id, 10);
     try {
+        // Get item name to check if tax-exempt
+        const itemQuery = await db.query(`SELECT name FROM items WHERE id = $1`, [itemId]);
+        const itemName = itemQuery.rows.length > 0 ? itemQuery.rows[0].name : null;
+        const isTaxExempt = itemName && taxExemptItems.has(itemName);
+        
         const sql = `
             SELECT
                 h.price      AS high,
                 h.timestamp  AS ts,
                 l.price      AS low,
-                l.timestamp  AS lowTs
+                l.timestamp  AS "lowTs"
             FROM price_instants h
             JOIN price_instants l
               ON h.item_id = l.item_id
@@ -59,8 +65,14 @@ router.get('/latest/:id', async (req, res) => {
         const { rows } = await db.query(sql, [itemId]);
         if (rows.length === 0) return res.status(404).json({ error: 'No data for item ' + itemId });
 
-        const { high, low, ts, lowTs } = rows[0];
-        const margin = Math.floor(high * 0.98) - low;
+        const row = rows[0];
+        const high = row.high;
+        const low = row.low;
+        const ts = row.ts;
+        const lowTs = row.lowTs || row.lowts; // Handle both cases for PostgreSQL case sensitivity
+        // Tax is 2% of high price, rounded down to nearest whole number (unless item is tax-exempt)
+        const tax = isTaxExempt ? 0 : Math.floor(high * 0.02);
+        const margin = high - tax - low;
         const roi = low > 0 ? parseFloat(((margin * 100.0 / low).toFixed(2))) : 0;
 
         const [trend_5m, trend_1h, trend_6h, trend_24h] = await Promise.all([
@@ -108,6 +120,15 @@ router.get('/latest', async (req, res) => {
         WHERE item_id IN (${placeholders})
     `;
     try {
+        // Get item names to check tax-exempt status
+        const itemNamesQuery = await db.query(`
+            SELECT id, name FROM items WHERE id IN (${placeholders})
+        `, ids);
+        const taxExemptMap = new Map();
+        itemNamesQuery.rows.forEach(row => {
+            taxExemptMap.set(row.id, taxExemptItems.has(row.name));
+        });
+        
         const { rows } = await db.query(sql, ids);
         const out = {};
 
@@ -117,12 +138,16 @@ router.get('/latest', async (req, res) => {
         }
 
         Object.entries(out).forEach(([key, val]) => {
+            const itemId = parseInt(key, 10);
             const high = val.high?.price ?? null;
             const ts = val.high?.timestamp ?? null;
             const low = val.low?.price ?? null;
             const lowTs = val.low?.timestamp ?? null;
+            // Tax is 2% of high price, rounded down to nearest whole number (unless item is tax-exempt)
+            const isTaxExempt = taxExemptMap.get(itemId) || false;
+            const tax = (high != null && !isTaxExempt) ? Math.floor(high * 0.02) : 0;
             const margin = (high != null && low != null)
-                ? Math.floor(high * 0.98) - low
+                ? high - tax - low
                 : null;
             const roi = (margin != null && low > 0)
                 ? parseFloat(((margin * 100.0 / low).toFixed(2)))
