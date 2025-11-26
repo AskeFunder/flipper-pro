@@ -321,8 +321,10 @@ export default function ItemDetailPage() {
     const niceStep = getNiceStep(paddedRange);
     
     // Round to nice ticks (down for bottom, up for top)
-    const yMin = Math.max(0, roundToNiceTick(minPaddingBottom, niceStep, true));
-    const yMax = roundToNiceTick(minPaddingTop, niceStep, false);
+    // Ensure stepSize is a whole number for whole number ticks only
+    const wholeNumberStep = Math.max(1, Math.round(niceStep));
+    const yMin = Math.max(0, Math.floor(roundToNiceTick(minPaddingBottom, wholeNumberStep, true)));
+    const yMax = Math.ceil(roundToNiceTick(minPaddingTop, wholeNumberStep, false));
 
     // Calculate volume data and scale for bottom 20% of graph
     const volumes = filtered.map(p => p.volume || 0).filter(v => v > 0);
@@ -407,8 +409,8 @@ export default function ItemDetailPage() {
                     return null;
                 }).filter(d => d !== null),
                 type: 'bar',
-                backgroundColor: 'rgba(100, 100, 255, 0.3)',
-                borderColor: 'rgba(100, 100, 255, 0.5)',
+                backgroundColor: 'rgba(200, 200, 220, 0.6)',
+                borderColor: 'rgba(200, 200, 220, 0.8)',
                 borderWidth: 1,
                 yAxisID: 'y',
             }
@@ -443,22 +445,382 @@ export default function ItemDetailPage() {
         scales: {
             x: { 
                 type: 'time', 
-                title: { display: true, text: 'Time' },
+                title: { display: false },
                 offset: false,
                 bounds: 'ticks',
                 min: xMin,
                 max: xMax,
                 grace: 0,
                 ticks: {
-                    padding: 0
-                }
+                    padding: 0,
+                    // For 4H time range, generate ticks at whole and half hours
+                    ...(timeRange === '4H' ? {
+                        source: 'data',
+                        maxTicksLimit: 20,
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            const minutes = date.getMinutes();
+                            // Only show labels at whole hours (0 min) or half hours (30 min)
+                            if (minutes === 0 || minutes === 30) {
+                                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            }
+                            return '';
+                        },
+                        // Generate ticks at whole and half hours
+                        stepSize: 30
+                    } : {}),
+                    // For 12H time range, show tick labels only at whole hours
+                    ...(timeRange === '12H' ? {
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        }
+                    } : {}),
+                    // For 1D time range, show tick labels at every 2nd whole hour
+                    ...(timeRange === '1D' ? {
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        }
+                    } : {}),
+                    // For 1W time range, show tick labels at each day
+                    ...(timeRange === '1W' ? {
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            return date.toLocaleDateString([], { weekday: 'long' });
+                        }
+                    } : {}),
+                    // For 1M time range, show tick labels at every 3rd day
+                    ...(timeRange === '1M' ? {
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                        }
+                    } : {}),
+                    // For 3M time range, show tick labels at every 8th day
+                    ...(timeRange === '3M' ? {
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                        }
+                    } : {}),
+                    // For 1Y time range, show tick labels at each month
+                    ...(timeRange === '1Y' ? {
+                        callback: function(value, index, ticks) {
+                            const date = new Date(value);
+                            return date.toLocaleDateString([], { month: 'short', year: 'numeric' });
+                        }
+                    } : {})
+                },
+                time: {
+                    // For 4H time range, set unit to minutes with 30-minute step
+                    ...(timeRange === '4H' ? {
+                        unit: 'minute',
+                        stepSize: 30,
+                        displayFormats: {
+                            minute: 'HH:mm'
+                        },
+                        // Round to nearest whole or half hour
+                        round: 'minute'
+                    } : {}),
+                    // For 12H time range, set unit to hour to generate ticks at whole hours
+                    ...(timeRange === '12H' ? {
+                        unit: 'hour',
+                        stepSize: 1,
+                        displayFormats: {
+                            hour: 'HH:mm'
+                        }
+                    } : {}),
+                    // For 1D time range, set unit to hour with 2-hour step
+                    ...(timeRange === '1D' ? {
+                        unit: 'hour',
+                        stepSize: 2,
+                        displayFormats: {
+                            hour: 'HH:mm'
+                        }
+                    } : {}),
+                    // For 1W time range, set unit to day
+                    ...(timeRange === '1W' ? {
+                        unit: 'day',
+                        stepSize: 1,
+                        displayFormats: {
+                            day: 'MMM d'
+                        }
+                    } : {}),
+                    // For 1M time range, set unit to day with 3-day step
+                    ...(timeRange === '1M' ? {
+                        unit: 'day',
+                        stepSize: 3,
+                        displayFormats: {
+                            day: 'MMM d'
+                        }
+                    } : {}),
+                    // For 3M time range, set unit to day with 8-day step
+                    ...(timeRange === '3M' ? {
+                        unit: 'day',
+                        stepSize: 8,
+                        displayFormats: {
+                            day: 'MMM d'
+                        }
+                    } : {}),
+                    // For 1Y time range, set unit to month
+                    ...(timeRange === '1Y' ? {
+                        unit: 'month',
+                        stepSize: 1,
+                        displayFormats: {
+                            month: 'MMM yyyy'
+                        }
+                    } : {})
+                },
+                // For 4H, use afterBuildTicks to generate ticks at whole and half hours
+                ...(timeRange === '4H' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first whole or half hour after min
+                        const startDate = new Date(min);
+                        const startMinutes = startDate.getMinutes();
+                        let firstTickMinutes = 0;
+                        if (startMinutes > 30) {
+                            // If we're past :30, start at next whole hour
+                            firstTickMinutes = 60;
+                            startDate.setHours(startDate.getHours() + 1);
+                            startDate.setMinutes(0);
+                        } else if (startMinutes > 0) {
+                            // If we're past :00 but before :30, start at :30
+                            firstTickMinutes = 30;
+                            startDate.setMinutes(30);
+                        } else {
+                            // Already at whole hour
+                            startDate.setMinutes(0);
+                        }
+                        
+                        let currentTick = startDate.getTime();
+                        const thirtyMinutes = 30 * 60 * 1000; // 30 minutes in milliseconds
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            currentTick += thirtyMinutes;
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
+                // For 12H, use afterBuildTicks to generate ticks at every whole hour
+                ...(timeRange === '12H' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first whole hour at or after min
+                        const startDate = new Date(min);
+                        startDate.setMinutes(0);
+                        startDate.setSeconds(0);
+                        startDate.setMilliseconds(0);
+                        
+                        // If we're not already at a whole hour, move to the next one
+                        if (startDate.getTime() < min) {
+                            startDate.setHours(startDate.getHours() + 1);
+                        }
+                        
+                        let currentTick = startDate.getTime();
+                        const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            currentTick += oneHour;
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
+                // For 1D, use afterBuildTicks to generate ticks at every 2nd whole hour
+                ...(timeRange === '1D' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first whole hour at or after min
+                        const startDate = new Date(min);
+                        startDate.setMinutes(0);
+                        startDate.setSeconds(0);
+                        startDate.setMilliseconds(0);
+                        
+                        // If we're not already at a whole hour, move to the next one
+                        if (startDate.getTime() < min) {
+                            startDate.setHours(startDate.getHours() + 1);
+                        }
+                        
+                        // Round to nearest even hour (0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22)
+                        const startHour = startDate.getHours();
+                        if (startHour % 2 !== 0) {
+                            startDate.setHours(startDate.getHours() + 1);
+                        }
+                        
+                        let currentTick = startDate.getTime();
+                        const twoHours = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            currentTick += twoHours;
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
+                // For 1W, use afterBuildTicks to generate ticks at the start of each day
+                ...(timeRange === '1W' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first day (midnight) at or after min
+                        const startDate = new Date(min);
+                        startDate.setHours(0);
+                        startDate.setMinutes(0);
+                        startDate.setSeconds(0);
+                        startDate.setMilliseconds(0);
+                        
+                        // If we're not already at midnight, move to the next day
+                        if (startDate.getTime() < min) {
+                            startDate.setDate(startDate.getDate() + 1);
+                        }
+                        
+                        let currentTick = startDate.getTime();
+                        const oneDay = 24 * 60 * 60 * 1000; // 1 day in milliseconds
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            currentTick += oneDay;
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
+                // For 1M, use afterBuildTicks to generate ticks at every 3rd day
+                ...(timeRange === '1M' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first day (midnight) at or after min
+                        const startDate = new Date(min);
+                        startDate.setHours(0);
+                        startDate.setMinutes(0);
+                        startDate.setSeconds(0);
+                        startDate.setMilliseconds(0);
+                        
+                        // If we're not already at midnight, move to the next day
+                        if (startDate.getTime() < min) {
+                            startDate.setDate(startDate.getDate() + 1);
+                        }
+                        
+                        // Round to nearest day that's a multiple of 3 from the start
+                        // We'll align to days 1, 4, 7, 10, 13, 16, 19, 22, 25, 28 of the month
+                        // Or we can just start from the first day and increment by 3
+                        let currentTick = startDate.getTime();
+                        const threeDays = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            currentTick += threeDays;
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
+                // For 3M, use afterBuildTicks to generate ticks at every 8th day
+                ...(timeRange === '3M' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first day (midnight) at or after min
+                        const startDate = new Date(min);
+                        startDate.setHours(0);
+                        startDate.setMinutes(0);
+                        startDate.setSeconds(0);
+                        startDate.setMilliseconds(0);
+                        
+                        // If we're not already at midnight, move to the next day
+                        if (startDate.getTime() < min) {
+                            startDate.setDate(startDate.getDate() + 1);
+                        }
+                        
+                        let currentTick = startDate.getTime();
+                        const eightDays = 8 * 24 * 60 * 60 * 1000; // 8 days in milliseconds
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            currentTick += eightDays;
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
+                // For 1Y, use afterBuildTicks to generate ticks at the start of each month
+                ...(timeRange === '1Y' ? {
+                    afterBuildTicks: (axis) => {
+                        const ticks = [];
+                        const min = axis.min;
+                        const max = axis.max;
+                        
+                        // Start from the first day of the month at or after min
+                        const startDate = new Date(min);
+                        startDate.setDate(1); // First day of the month
+                        startDate.setHours(0);
+                        startDate.setMinutes(0);
+                        startDate.setSeconds(0);
+                        startDate.setMilliseconds(0);
+                        
+                        // If we're not already at the first of the month, move to the next month
+                        if (startDate.getTime() < min) {
+                            startDate.setMonth(startDate.getMonth() + 1);
+                        }
+                        
+                        let currentTick = startDate.getTime();
+                        
+                        while (currentTick <= max) {
+                            ticks.push({ value: currentTick });
+                            // Move to the first day of the next month
+                            const nextDate = new Date(currentTick);
+                            nextDate.setMonth(nextDate.getMonth() + 1);
+                            currentTick = nextDate.getTime();
+                        }
+                        
+                        axis.ticks = ticks;
+                    }
+                } : {}),
             },
             y: { 
-                title: { display: true, text: 'Price (gp)' },
+                title: { display: false },
                 min: yMin,
                 max: yMax,
                 ticks: {
-                    stepSize: niceStep
+                    stepSize: wholeNumberStep,
+                    callback: function(value) {
+                        // Only show ticks at whole numbers, hide decimals
+                        if (value % 1 !== 0) {
+                            return '';
+                        }
+                        const rounded = Math.round(value);
+                        // Use compact formatting for large numbers (k, m, b)
+                        if (rounded >= 1000000000) {
+                            return (rounded / 1000000000).toFixed(1).replace(/\.0$/, '') + 'b';
+                        } else if (rounded >= 1000000) {
+                            return (rounded / 1000000).toFixed(1).replace(/\.0$/, '') + 'm';
+                        } else if (rounded >= 1000) {
+                            return (rounded / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+                        }
+                        return rounded.toLocaleString();
+                    }
                 }
             }
         }
