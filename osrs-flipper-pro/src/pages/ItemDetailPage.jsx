@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import {
@@ -33,6 +33,216 @@ ChartJS.register(
     Legend,
     Tooltip
 );
+
+// Register custom plugin for vertical line on hover
+ChartJS.register({
+    id: 'verticalLine',
+    afterDraw: (chart) => {
+        if (chart.tooltip._active && chart.tooltip._active.length) {
+            const ctx = chart.ctx;
+            const x = chart.tooltip._active[0].element.x;
+            const topY = chart.scales.y.top;
+            const bottomY = chart.scales.y.bottom;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x, topY);
+            ctx.lineTo(x, bottomY);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+});
+
+// Global callback for zoom - will be set by component
+let globalZoomCallback = null;
+// Global drag state for direct event listeners
+let globalDragState = {
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    endX: 0,
+    endY: 0
+};
+
+// Register custom plugin for drag-to-zoom
+ChartJS.register({
+    id: 'dragToZoom',
+    beforeInit: (chart) => {
+        chart.dragZoom = {
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            endX: 0,
+            endY: 0,
+            onZoomComplete: null
+        };
+    },
+    afterEvent: (chart, args) => {
+        const event = args.event;
+        const canvas = chart.canvas;
+        
+        if (!chart.dragZoom) {
+            chart.dragZoom = {
+                isDragging: false,
+                startX: 0,
+                startY: 0,
+                endX: 0,
+                endY: 0,
+                onZoomComplete: null
+            };
+        }
+        
+        // Make sure chartArea is initialized
+        if (!chart.chartArea) return;
+        
+        // Get the native event - Chart.js wraps it differently
+        const nativeEvent = event.native || event.originalEvent || event;
+        
+        if (event.type === 'mousedown' && nativeEvent) {
+            // Check for left mouse button
+            const isLeftButton = (nativeEvent.buttons === 1 || nativeEvent.button === 0 || nativeEvent.button === undefined);
+            if (isLeftButton) {
+                const rect = canvas.getBoundingClientRect();
+                const x = nativeEvent.clientX - rect.left;
+                const y = nativeEvent.clientY - rect.top;
+                
+                // Check if click is within chart area
+                if (x >= chart.chartArea.left && x <= chart.chartArea.right &&
+                    y >= chart.chartArea.top && y <= chart.chartArea.bottom) {
+                    chart.dragZoom.isDragging = true;
+                    chart.dragZoom.startX = x;
+                    chart.dragZoom.startY = y;
+                    chart.dragZoom.endX = x;
+                    chart.dragZoom.endY = y;
+                    canvas.style.cursor = 'crosshair';
+                }
+            }
+        } else if (event.type === 'mousemove' && chart.dragZoom.isDragging) {
+            const rect = canvas.getBoundingClientRect();
+            const nativeEvent = event.native || event.originalEvent || event;
+            chart.dragZoom.endX = nativeEvent.clientX - rect.left;
+            chart.dragZoom.endY = nativeEvent.clientY - rect.top;
+            chart.draw();
+        } else if (event.type === 'mouseup' && chart.dragZoom.isDragging) {
+            chart.dragZoom.isDragging = false;
+            canvas.style.cursor = 'default';
+            
+            const startX = Math.min(chart.dragZoom.startX, chart.dragZoom.endX);
+            const endX = Math.max(chart.dragZoom.startX, chart.dragZoom.endX);
+            const startY = Math.min(chart.dragZoom.startY, chart.dragZoom.endY);
+            const endY = Math.max(chart.dragZoom.startY, chart.dragZoom.endY);
+            
+            // Only zoom if selection is large enough (at least 10 pixels)
+            if (Math.abs(endX - startX) > 10 && Math.abs(endY - startY) > 10) {
+                const xScale = chart.scales.x;
+                const minValue = xScale.getValueForPixel(startX);
+                const maxValue = xScale.getValueForPixel(endX);
+                
+                // Use global callback or chart-specific callback
+                const callback = chart.dragZoom.onZoomComplete || globalZoomCallback;
+                if (callback) {
+                    callback(new Date(minValue), new Date(maxValue));
+                }
+            }
+            
+            chart.dragZoom.startX = 0;
+            chart.dragZoom.startY = 0;
+            chart.dragZoom.endX = 0;
+            chart.dragZoom.endY = 0;
+            chart.draw();
+        } else if (event.type === 'dblclick') {
+            // Double-click to reset zoom
+            const callback = chart.dragZoom?.onZoomComplete || globalZoomCallback;
+            if (callback) {
+                callback(null, null);
+            }
+        }
+    },
+    afterDraw: (chart) => {
+        // Check both plugin drag state and global drag state
+        const isDragging = (chart.dragZoom && chart.dragZoom.isDragging) || globalDragState.isDragging;
+        if (isDragging && chart.chartArea) {
+            const ctx = chart.ctx;
+            let startX, endX;
+            
+            if (chart.dragZoom && chart.dragZoom.isDragging) {
+                startX = Math.min(chart.dragZoom.startX, chart.dragZoom.endX);
+                endX = Math.max(chart.dragZoom.startX, chart.dragZoom.endX);
+            } else {
+                startX = Math.min(globalDragState.startX, globalDragState.endX);
+                endX = Math.max(globalDragState.startX, globalDragState.endX);
+            }
+            
+            // Use full vertical height of chart area
+            const topY = chart.chartArea.top;
+            const bottomY = chart.chartArea.bottom;
+            
+            ctx.save();
+            ctx.fillStyle = 'rgba(54, 162, 235, 0.1)';
+            
+            ctx.fillRect(startX, topY, endX - startX, bottomY - topY);
+            
+            ctx.restore();
+        }
+    }
+});
+
+// Register custom plugin to align bars with exact timestamps and ensure consistent thickness
+ChartJS.register({
+    id: 'alignBarsToTimestamps',
+    afterLayout: (chart) => {
+        // Find the volume bar dataset
+        const volumeDatasetIndex = chart.data.datasets.findIndex(d => d.label === 'Volume');
+        if (volumeDatasetIndex === -1) return;
+        
+        const meta = chart.getDatasetMeta(volumeDatasetIndex);
+        if (!meta || meta.type !== 'bar') return;
+        
+        const xScale = chart.scales.x;
+        const dataset = chart.data.datasets[volumeDatasetIndex];
+        
+        // Calculate consistent bar width based on average spacing of valid data points
+        const validDataPoints = dataset.data.filter(d => d && d.x != null);
+        if (validDataPoints.length < 2) return;
+        
+        // Calculate average time interval
+        const intervals = [];
+        for (let i = 1; i < validDataPoints.length; i++) {
+            const interval = validDataPoints[i].x - validDataPoints[i-1].x;
+            if (interval > 0) intervals.push(interval);
+        }
+        const avgInterval = intervals.length > 0 
+            ? intervals.reduce((a, b) => a + b, 0) / intervals.length 
+            : 0;
+        
+        // Calculate bar width in pixels (80% of average interval)
+        const barWidthPx = avgInterval > 0 
+            ? (xScale.getPixelForValue(validDataPoints[0].x + avgInterval) - xScale.getPixelForValue(validDataPoints[0].x)) * 0.8
+            : 20;
+        
+        // Update each bar position and width (skip NaN/invalid values)
+        meta.data.forEach((bar, index) => {
+            const dataPoint = dataset.data[index];
+            if (!dataPoint || dataPoint.x == null || isNaN(dataPoint.y) || (dataPoint.rawVolume === 0)) {
+                // Hide bars for NaN/invalid values or zero volume
+                bar.hidden = true;
+                return;
+            }
+            
+            // Get the exact x position for this timestamp
+            const exactX = xScale.getPixelForValue(dataPoint.x);
+            
+            // Update bar position and width
+            bar.x = exactX;
+            bar.width = Math.max(2, barWidthPx);
+            bar.hidden = false;
+        });
+    }
+});
 
 const API_BASE = "http://localhost:3001";
 
@@ -85,6 +295,11 @@ export default function ItemDetailPage() {
     const [priceData, setPriceData] = useState([]);
     const [recentTrades, setRecentTrades] = useState([]);
     const [timeRange, setTimeRange] = useState('12H');
+    
+    // Zoom state
+    const [zoomBounds, setZoomBounds] = useState({ min: null, max: null });
+    const [chartKey, setChartKey] = useState(0);
+    const chartRef = useRef(null);
 
     // Fetch canonical data first to get item_id and limit
     useEffect(() => {
@@ -208,6 +423,212 @@ export default function ItemDetailPage() {
         const int = setInterval(fetchRecent, 15000);
         return () => clearInterval(int);
     }, [canonicalData]);
+    
+    // Set up zoom callback - use global callback that plugin can access
+    useEffect(() => {
+        globalZoomCallback = (min, max) => {
+            if (min === null && max === null) {
+                // Reset zoom
+                setZoomBounds({ min: null, max: null });
+            } else {
+                // Apply zoom
+                setZoomBounds({ min, max });
+            }
+        };
+        
+        return () => {
+            globalZoomCallback = null;
+        };
+    }, []);
+    
+    // Always reset zoom bounds when granularity changes
+    useEffect(() => {
+        setZoomBounds({ min: null, max: null });
+    }, [selectedGranularity]);
+    
+    // Always reset zoom bounds when time range changes
+    useEffect(() => {
+        setZoomBounds({ min: null, max: null });
+    }, [timeRange]);
+    
+    // Set up direct canvas event listeners for drag-to-zoom
+    useEffect(() => {
+        let cleanup = null;
+        
+        // Wait a bit for chart to be ready
+        const timer = setTimeout(() => {
+            if (!chartRef.current) return;
+            
+            // react-chartjs-2 stores canvas in different places
+            const chartInstance = chartRef.current._chart || chartRef.current.chartInstance || chartRef.current;
+            const canvas = chartInstance?.canvas || chartRef.current.canvas || chartRef.current;
+            if (!canvas || !canvas.getBoundingClientRect) return;
+        
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
+            let endX = 0;
+            let endY = 0;
+            
+            // Helper function to snap X position to nearest data point
+            const snapToNearestDataPoint = (x, chart) => {
+                if (!chart || !chart.scales || !chart.scales.x) return x;
+                
+                const xScale = chart.scales.x;
+                const datasets = chart.data.datasets;
+                if (!datasets || datasets.length === 0) return x;
+                
+                // Get all data points from first dataset (they all have same x values)
+                const firstDataset = datasets[0];
+                if (!firstDataset || !firstDataset.data) return x;
+                
+                // Find nearest data point
+                let nearestX = x;
+                let minDistance = Infinity;
+                
+                firstDataset.data.forEach((point) => {
+                    if (point && point.x != null) {
+                        const pointX = xScale.getPixelForValue(point.x);
+                        const distance = Math.abs(pointX - x);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestX = pointX;
+                        }
+                    }
+                });
+                
+                return nearestX;
+            };
+            
+            const handleMouseDown = (e) => {
+                if (e.button !== 0) return; // Only left mouse button
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Get chart instance to check chartArea
+                const chart = chartRef.current?._chart || chartRef.current?.chartInstance || chartRef.current;
+                if (!chart || !chart.chartArea) return;
+                
+                if (x >= chart.chartArea.left && x <= chart.chartArea.right &&
+                    y >= chart.chartArea.top && y <= chart.chartArea.bottom) {
+                    // Snap to nearest data point
+                    const snappedX = snapToNearestDataPoint(x, chart);
+                    
+                    isDragging = true;
+                    startX = snappedX;
+                    startY = y;
+                    endX = snappedX;
+                    endY = y;
+                    
+                    // Update global drag state
+                    globalDragState.isDragging = true;
+                    globalDragState.startX = snappedX;
+                    globalDragState.startY = y;
+                    globalDragState.endX = snappedX;
+                    globalDragState.endY = y;
+                    
+                    // Disable tooltip while dragging
+                    if (chart && chart.options && chart.options.plugins && chart.options.plugins.tooltip) {
+                        chart.options.plugins.tooltip.enabled = false;
+                    }
+                    
+                    canvas.style.cursor = 'crosshair';
+                }
+            };
+            
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const rawX = e.clientX - rect.left;
+                const rawY = e.clientY - rect.top;
+                
+                // Get chart instance
+                const chart = chartRef.current?._chart || chartRef.current?.chartInstance || chartRef.current;
+                
+                // Snap to nearest data point
+                const snappedX = snapToNearestDataPoint(rawX, chart);
+                
+                endX = snappedX;
+                endY = rawY;
+                
+                // Update global drag state
+                globalDragState.endX = snappedX;
+                globalDragState.endY = rawY;
+                
+                // Force chart update to show selection rectangle
+                if (chart) {
+                    chart.update('none'); // Update without animation
+                }
+            };
+            
+            const handleMouseUp = (e) => {
+                if (!isDragging) return;
+                
+                isDragging = false;
+                globalDragState.isDragging = false;
+                canvas.style.cursor = 'default';
+                
+                // Re-enable tooltip after dragging
+                const chart = chartRef.current?._chart || chartRef.current?.chartInstance || chartRef.current;
+                if (chart && chart.options && chart.options.plugins && chart.options.plugins.tooltip) {
+                    chart.options.plugins.tooltip.enabled = true;
+                }
+                
+                const startXFinal = Math.min(startX, endX);
+                const endXFinal = Math.max(startX, endX);
+                
+                // Only zoom if selection is large enough (only check X since markering is full vertical)
+                if (Math.abs(endXFinal - startXFinal) > 10) {
+                    const chart = chartRef.current?._chart || chartRef.current?.chartInstance || chartRef.current;
+                    if (chart && chart.scales && chart.scales.x) {
+                        const xScale = chart.scales.x;
+                        const minValue = xScale.getValueForPixel(startXFinal);
+                        const maxValue = xScale.getValueForPixel(endXFinal);
+                        
+                        if (globalZoomCallback) {
+                            globalZoomCallback(new Date(minValue), new Date(maxValue));
+                        }
+                    }
+                }
+                
+                startX = 0;
+                startY = 0;
+                endX = 0;
+                endY = 0;
+                globalDragState.startX = 0;
+                globalDragState.startY = 0;
+                globalDragState.endX = 0;
+                globalDragState.endY = 0;
+            };
+            
+            const handleDblClick = () => {
+                if (globalZoomCallback) {
+                    globalZoomCallback(null, null);
+                }
+            };
+            
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('dblclick', handleDblClick);
+            
+            // Store cleanup function in outer scope
+            cleanup = () => {
+                canvas.removeEventListener('mousedown', handleMouseDown);
+                canvas.removeEventListener('mousemove', handleMouseMove);
+                canvas.removeEventListener('mouseup', handleMouseUp);
+                canvas.removeEventListener('dblclick', handleDblClick);
+            };
+        }, 200);
+        
+        return () => {
+            clearTimeout(timer);
+            if (cleanup) cleanup();
+        };
+    }, [priceData, timeRange]);
 
     if (basicLoading || advancedLoading) {
         return (
@@ -261,8 +682,12 @@ export default function ItemDetailPage() {
     const filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
 
     // Calculate min/max for x-axis - NO PADDING, exact bounds
-    const xMin = filtered.length > 0 ? new Date(Math.min(...filtered.map(p => p.ts * 1000))) : null;
-    const xMax = filtered.length > 0 ? new Date(Math.max(...filtered.map(p => p.ts * 1000))) : null;
+    const calculatedXMin = filtered.length > 0 ? new Date(Math.min(...filtered.map(p => p.ts * 1000))) : null;
+    const calculatedXMax = filtered.length > 0 ? new Date(Math.max(...filtered.map(p => p.ts * 1000))) : null;
+    
+    // Use zoom bounds if set, otherwise use calculated bounds
+    const xMin = zoomBounds.min || calculatedXMin;
+    const xMax = zoomBounds.max || calculatedXMax;
 
     // Calculate min/max for y-axis with padding
     const allPrices = filtered.flatMap(p => [p.high, p.low]).filter(v => v != null && v > 0);
@@ -336,8 +761,12 @@ export default function ItemDetailPage() {
     // Helper function to determine point radius
     // Show filled dots only if there's 1 data point total (so it's visible)
     // If there's more than 1 data point, don't show dots (lines connect them)
+    // Also hide dots when dragging to zoom
     const getPointRadius = (dataArray, totalValidPoints = 0) => {
         return (ctx) => {
+            // Hide all points when dragging
+            if (globalDragState.isDragging) return 0;
+            
             const index = ctx.dataIndex;
             const value = dataArray[index];
             
@@ -350,6 +779,15 @@ export default function ItemDetailPage() {
         };
     };
     
+    // Helper function to determine hover radius - hide when dragging
+    const getPointHoverRadius = () => {
+        return (ctx) => {
+            // Hide hover effect when dragging
+            if (globalDragState.isDragging) return 0;
+            return 4;
+        };
+    };
+    
     // Count valid data points for buy and sell separately
     const buyDataPoints = filtered.map(p => p.high).filter(v => v != null && v !== undefined && !isNaN(v) && v > 0);
     const sellDataPoints = filtered.map(p => p.low).filter(v => v != null && v !== undefined && !isNaN(v) && v > 0);
@@ -359,7 +797,7 @@ export default function ItemDetailPage() {
         datasets: [
             {
                 label: "Buy",
-                data: filtered.map(p => p.high),
+                data: filtered.map(p => ({ x: p.ts * 1000, y: p.high })),
                 borderColor: "green",
                 backgroundColor: "green",
                 tension: 0.1,
@@ -370,7 +808,7 @@ export default function ItemDetailPage() {
                 pointBackgroundColor: "green",
                 pointBorderColor: "green",
                 pointBorderWidth: 2,
-                pointHoverRadius: 4,
+                pointHoverRadius: getPointHoverRadius(),
                 pointHoverBackgroundColor: "green",
                 pointHoverBorderColor: "green",
                 pointHoverBorderWidth: 2,
@@ -379,7 +817,7 @@ export default function ItemDetailPage() {
             },
             {
                 label: "Sell",
-                data: filtered.map(p => p.low),
+                data: filtered.map(p => ({ x: p.ts * 1000, y: p.low })),
                 borderColor: "red",
                 backgroundColor: "red",
                 tension: 0.1,
@@ -390,7 +828,7 @@ export default function ItemDetailPage() {
                 pointBackgroundColor: "red",
                 pointBorderColor: "red",
                 pointBorderWidth: 2,
-                pointHoverRadius: 4,
+                pointHoverRadius: getPointHoverRadius(),
                 pointHoverBackgroundColor: "red",
                 pointHoverBorderColor: "red",
                 pointHoverBorderWidth: 2,
@@ -406,13 +844,18 @@ export default function ItemDetailPage() {
                         const scaledY = volumeBottom + (vol / maxVolume) * (volumeTop - volumeBottom);
                         return { x: p.ts * 1000, y: scaledY, rawVolume: vol };
                     }
-                    return null;
-                }).filter(d => d !== null),
+                    // Return a sentinel value with NaN y to maintain index alignment (Chart.js will skip NaN values)
+                    return { x: p.ts * 1000, y: NaN, rawVolume: 0 };
+                }),
                 type: 'bar',
                 backgroundColor: 'rgba(200, 200, 220, 0.6)',
                 borderColor: 'rgba(200, 200, 220, 0.8)',
                 borderWidth: 1,
                 yAxisID: 'y',
+                // Bar thickness will be set by custom plugin to ensure consistency
+                barThickness: undefined,
+                // Ensure bars are positioned at exact timestamps, not category centers
+                base: undefined,
             }
         ]
     };
@@ -420,24 +863,54 @@ export default function ItemDetailPage() {
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
+        interaction: { 
+            mode: 'index', 
+            intersect: false,
+            // Match by x value (timestamp) instead of index to handle gaps
+            axis: 'x'
+        },
         plugins: {
             tooltip: {
+                filter: function(tooltipItem) {
+                    // Don't show tooltip if currently dragging
+                    if (globalDragState.isDragging) return false;
+                    
+                    // Only show tooltips for items that have valid data
+                    const parsedY = tooltipItem.parsed.y;
+                    if (parsedY == null || isNaN(parsedY)) return false;
+                    
+                    // For Volume dataset, also check rawVolume
+                    if (tooltipItem.dataset.label === 'Volume') {
+                        const rawVolume = tooltipItem.raw?.rawVolume;
+                        return rawVolume != null && rawVolume > 0;
+                    }
+                    
+                    return true;
+                },
                 callbacks: {
-                    title: items => new Date(items[0].parsed.x).toLocaleString(),
+                    title: items => {
+                        const validItem = items.find(item => item.parsed && item.parsed.x != null);
+                        if (!validItem) return '';
+                        return new Date(validItem.parsed.x).toLocaleString();
+                    },
                     label: function(context) {
                         const dataset = context.dataset;
+                        const parsedY = context.parsed.y;
+                        
+                        // Safety check - should be filtered by filter callback, but just in case
+                        if (parsedY == null || isNaN(parsedY)) return null;
+                        
                         if (dataset.label === 'Volume') {
                             const rawVolume = context.raw?.rawVolume;
-                            if (rawVolume) {
+                            if (rawVolume && rawVolume > 0) {
                                 // Show actual volume value
                                 if (rawVolume >= 1000000) return `Volume: ${(rawVolume / 1000000).toFixed(1)}M`;
                                 if (rawVolume >= 1000) return `Volume: ${(rawVolume / 1000).toFixed(1)}K`;
                                 return `Volume: ${rawVolume.toLocaleString()}`;
                             }
-                            return `Volume: ${context.parsed.y.toLocaleString()}`;
+                            return null;
                         }
-                        return `${dataset.label}: ${context.parsed.y.toLocaleString()} gp`;
+                        return `${dataset.label}: ${parsedY.toLocaleString()} gp`;
                     }
                 }
             }
@@ -447,10 +920,11 @@ export default function ItemDetailPage() {
                 type: 'time', 
                 title: { display: false },
                 offset: false,
-                bounds: 'ticks',
+                bounds: 'data',
                 min: xMin,
                 max: xMax,
                 grace: 0,
+                distribution: 'series',
                 ticks: {
                     padding: 0,
                     // For 4H time range, generate ticks at whole and half hours
@@ -890,8 +1364,45 @@ export default function ItemDetailPage() {
                                 No price data available in selected range.
                             </div>
                         ) : (
-                            <div style={{ height: '60vh' }}>
-                                <Line data={chartData} options={chartOptions} />
+                            <div style={{ height: '60vh', position: 'relative' }}>
+                                {/* Reset Zoom Button */}
+                                {zoomBounds.min && zoomBounds.max && (
+                                    <button
+                                        onClick={() => {
+                                            setZoomBounds({ min: null, max: null });
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '40px',
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            zIndex: 10,
+                                            padding: '6px 12px',
+                                            backgroundColor: '#3b82f6',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.875rem',
+                                            fontWeight: '500',
+                                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.target.style.backgroundColor = '#2563eb';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.backgroundColor = '#3b82f6';
+                                        }}
+                                    >
+                                        Reset Zoom
+                                    </button>
+                                )}
+                                <Line 
+                                    key={`chart-${selectedGranularity}`}
+                                    ref={chartRef} 
+                                    data={chartData} 
+                                    options={chartOptions} 
+                                />
                             </div>
                         )}
                     </div>
