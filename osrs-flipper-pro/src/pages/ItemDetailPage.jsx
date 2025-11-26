@@ -268,6 +268,9 @@ export default function ItemDetailPage() {
     const allPrices = filtered.flatMap(p => [p.high, p.low]).filter(v => v != null && v > 0);
     const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 0;
     const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : 0;
+    
+    // Check if there are any valid price points (high or low > 0)
+    const hasValidPriceData = allPrices.length > 0;
     const avgPrice = allPrices.length > 0 ? allPrices.reduce((a, b) => a + b, 0) / allPrices.length : 0;
     
     // Detect spikes/crashes: if max is more than 3x the average, it's likely a spike
@@ -328,6 +331,27 @@ export default function ItemDetailPage() {
     const volumeBottom = yMin;
     const volumeTop = yMin + priceRangeForVolume * 0.2; // Bottom 20% of price range
 
+    // Helper function to determine point radius
+    // Show filled dots only if there's 1 data point total (so it's visible)
+    // If there's more than 1 data point, don't show dots (lines connect them)
+    const getPointRadius = (dataArray, totalValidPoints = 0) => {
+        return (ctx) => {
+            const index = ctx.dataIndex;
+            const value = dataArray[index];
+            
+            // If this point has no value, don't show a dot
+            if (value == null || value === undefined) return 0;
+            
+            // If there's only 1 valid data point total, show a dot so it's visible
+            // If there's more than 1, don't show dots (lines connect them)
+            return totalValidPoints === 1 ? 3 : 0;
+        };
+    };
+    
+    // Count valid data points for buy and sell separately
+    const buyDataPoints = filtered.map(p => p.high).filter(v => v != null && v !== undefined && !isNaN(v) && v > 0);
+    const sellDataPoints = filtered.map(p => p.low).filter(v => v != null && v !== undefined && !isNaN(v) && v > 0);
+
     const chartData = {
         labels: filtered.map(p => new Date(p.ts * 1000)),
         datasets: [
@@ -335,8 +359,19 @@ export default function ItemDetailPage() {
                 label: "Buy",
                 data: filtered.map(p => p.high),
                 borderColor: "green",
+                backgroundColor: "green",
                 tension: 0.1,
-                pointRadius: 0,
+                pointRadius: getPointRadius(
+                    filtered.map(p => p.high),
+                    buyDataPoints.length
+                ),
+                pointBackgroundColor: "green",
+                pointBorderColor: "green",
+                pointBorderWidth: 2,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: "green",
+                pointHoverBorderColor: "green",
+                pointHoverBorderWidth: 2,
                 spanGaps: true,
                 yAxisID: 'y',
             },
@@ -344,8 +379,19 @@ export default function ItemDetailPage() {
                 label: "Sell",
                 data: filtered.map(p => p.low),
                 borderColor: "red",
+                backgroundColor: "red",
                 tension: 0.1,
-                pointRadius: 0,
+                pointRadius: getPointRadius(
+                    filtered.map(p => p.low),
+                    sellDataPoints.length
+                ),
+                pointBackgroundColor: "red",
+                pointBorderColor: "red",
+                pointBorderWidth: 2,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: "red",
+                pointHoverBorderColor: "red",
+                pointHoverBorderWidth: 2,
                 spanGaps: true,
                 yAxisID: 'y',
             },
@@ -469,8 +515,18 @@ export default function ItemDetailPage() {
                         </div>
 
                         {/* Chart */}
-                        {filtered.length === 0 ? (
-                            <p>No price data available in selected range.</p>
+                        {!hasValidPriceData ? (
+                            <div style={{ 
+                                height: '60vh', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                color: '#6b7280',
+                                fontSize: '16px',
+                                fontStyle: 'italic'
+                            }}>
+                                No price data available in selected range.
+                            </div>
                         ) : (
                             <div style={{ height: '60vh' }}>
                                 <Line data={chartData} options={chartOptions} />
