@@ -120,18 +120,30 @@ async function pollLatest() {
     try {
         await db.query("BEGIN");
 
+        let rowsUpdated = 0;
+        let rowsSkipped = 0;
+
         for (const [itemIdStr, entry] of Object.entries(data)) {
             const itemId = parseInt(itemIdStr, 10);
 
             if (entry.high !== null && entry.highTime !== null) {
-                await db.query(`
+                const result = await db.query(`
                     INSERT INTO price_instants (item_id, price, type, timestamp, last_updated)
                     VALUES ($1, $2, 'high', $3, $4)
                     ON CONFLICT (item_id, type) DO UPDATE SET
                         price = EXCLUDED.price,
                         timestamp = EXCLUDED.timestamp,
-                        last_updated = EXCLUDED.last_updated;
+                        last_updated = EXCLUDED.last_updated
+                    WHERE price_instants.timestamp IS DISTINCT FROM EXCLUDED.timestamp;
                 `, [itemId, entry.high, entry.highTime, now]);
+                
+                // rowCount = 1: INSERT or UPDATE happened
+                // rowCount = 0: Row exists but WHERE clause prevented UPDATE (dedupe working)
+                if (result.rowCount > 0) {
+                    rowsUpdated++;
+                } else {
+                    rowsSkipped++;
+                }
 
                 await db.query(`
                     INSERT INTO price_instant_log (item_id, price, type, timestamp, seen_at)
@@ -141,14 +153,23 @@ async function pollLatest() {
             }
 
             if (entry.low !== null && entry.lowTime !== null) {
-                await db.query(`
+                const result = await db.query(`
                     INSERT INTO price_instants (item_id, price, type, timestamp, last_updated)
                     VALUES ($1, $2, 'low', $3, $4)
                     ON CONFLICT (item_id, type) DO UPDATE SET
                         price = EXCLUDED.price,
                         timestamp = EXCLUDED.timestamp,
-                        last_updated = EXCLUDED.last_updated;
+                        last_updated = EXCLUDED.last_updated
+                    WHERE price_instants.timestamp IS DISTINCT FROM EXCLUDED.timestamp;
                 `, [itemId, entry.low, entry.lowTime, now]);
+                
+                // rowCount = 1: INSERT or UPDATE happened
+                // rowCount = 0: Row exists but WHERE clause prevented UPDATE (dedupe working)
+                if (result.rowCount > 0) {
+                    rowsUpdated++;
+                } else {
+                    rowsSkipped++;
+                }
 
                 await db.query(`
                     INSERT INTO price_instant_log (item_id, price, type, timestamp, seen_at)
@@ -163,7 +184,7 @@ async function pollLatest() {
         const itemCount = Object.keys(data).length;
         const itemsPerSec = (itemCount / parseFloat(elapsedTime)).toFixed(0);
         const modeLabel = MOCK_LATEST ? `[MOCK]` : `[LATEST]`;
-        console.log(`${modeLabel} Updated ${itemCount} items @ ${new Date().toISOString()}`);
+        console.log(`${modeLabel} Processed ${itemCount} items, updated ${rowsUpdated} rows, skipped ${rowsSkipped} (dedupe) @ ${new Date().toISOString()}`);
         console.log(`[PERF] pollLatest: ${itemCount} items in ${elapsedTime}s → ${itemsPerSec}/sec`);
     } catch (err) {
         await db.query("ROLLBACK");
