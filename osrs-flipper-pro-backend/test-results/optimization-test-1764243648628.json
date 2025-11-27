@@ -1,0 +1,1209 @@
+{
+  "timestamp": "2025-11-27T11:39:50.898Z",
+  "config": {
+    "batchSizes": [
+      50,
+      100,
+      200,
+      300,
+      500
+    ],
+    "iterations": 5,
+    "testScenarios": [
+      {
+        "name": "trends_only",
+        "description": "Trends calculation only"
+      },
+      {
+        "name": "full_update",
+        "description": "Full canonical update"
+      }
+    ]
+  },
+  "results": {
+    "trends_only": {
+      "50": {
+        "testName": "trends_only",
+        "batchSize": 50,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 199.651510158586,
+          "min": 154.320987654321,
+          "max": 231.4814814814815,
+          "stdDev": 31.32807195753998
+        },
+        "cpuTimeMs": {
+          "mean": 43.8,
+          "min": 0,
+          "max": 78
+        },
+        "cpuPercent": {
+          "mean": 17.082433993470296,
+          "min": 0,
+          "max": 33.05084745762713
+        },
+        "memoryDelta": {
+          "mean": 413217.6,
+          "min": -791808,
+          "max": 916432
+        },
+        "queryCount": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "queryTimeMs": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "rawResults": [
+          {
+            "testName": "trends_only",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.324,
+            "itemsPerSecond": 154.320987654321,
+            "trendsPerSecond": 867.283950617284,
+            "cpuTimeMs": 47,
+            "cpuPercent": 14.506172839506174,
+            "memoryDelta": 663640,
+            "memoryPeak": 2004,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 281,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.292,
+            "itemsPerSecond": 171.2328767123288,
+            "trendsPerSecond": 962.3287671232878,
+            "cpuTimeMs": 47,
+            "cpuPercent": 16.095890410958905,
+            "memoryDelta": 916432,
+            "memoryPeak": 352,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 281,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.218,
+            "itemsPerSecond": 229.3577981651376,
+            "trendsPerSecond": 1288.9908256880733,
+            "cpuTimeMs": 0,
+            "cpuPercent": 0,
+            "memoryDelta": -791808,
+            "memoryPeak": 1540,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 281,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.216,
+            "itemsPerSecond": 231.4814814814815,
+            "trendsPerSecond": 1300.9259259259259,
+            "cpuTimeMs": 47,
+            "cpuPercent": 21.75925925925926,
+            "memoryDelta": 709256,
+            "memoryPeak": 1584,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 281,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.236,
+            "itemsPerSecond": 211.86440677966104,
+            "trendsPerSecond": 1190.677966101695,
+            "cpuTimeMs": 78,
+            "cpuPercent": 33.05084745762713,
+            "memoryDelta": 568568,
+            "memoryPeak": 1680,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 281,
+            "itemsWithTrends": 50
+          }
+        ]
+      },
+      "100": {
+        "testName": "trends_only",
+        "batchSize": 100,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 284.59011290003343,
+          "min": 277.0083102493075,
+          "max": 296.7359050445104,
+          "stdDev": 7.126562103874755
+        },
+        "cpuTimeMs": {
+          "mean": 25.2,
+          "min": 0,
+          "max": 63
+        },
+        "cpuPercent": {
+          "mean": 7.173882073605066,
+          "min": 0,
+          "max": 18
+        },
+        "memoryDelta": {
+          "mean": 404276.8,
+          "min": -798688,
+          "max": 2735248
+        },
+        "queryCount": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "queryTimeMs": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "rawResults": [
+          {
+            "testName": "trends_only",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.337,
+            "itemsPerSecond": 296.7359050445104,
+            "trendsPerSecond": 1635.0148367952522,
+            "cpuTimeMs": 0,
+            "cpuPercent": 0,
+            "memoryDelta": -59800,
+            "memoryPeak": 1716,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 551,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.361,
+            "itemsPerSecond": 277.0083102493075,
+            "trendsPerSecond": 1526.3157894736842,
+            "cpuTimeMs": 15,
+            "cpuPercent": 4.1551246537396125,
+            "memoryDelta": 244840,
+            "memoryPeak": 0,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 551,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.36,
+            "itemsPerSecond": 277.77777777777777,
+            "trendsPerSecond": 1530.5555555555557,
+            "cpuTimeMs": 0,
+            "cpuPercent": 0,
+            "memoryDelta": -100216,
+            "memoryPeak": 0,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 551,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.35,
+            "itemsPerSecond": 285.7142857142857,
+            "trendsPerSecond": 1574.2857142857144,
+            "cpuTimeMs": 63,
+            "cpuPercent": 18,
+            "memoryDelta": 2735248,
+            "memoryPeak": 0,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 551,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.35,
+            "itemsPerSecond": 285.7142857142857,
+            "trendsPerSecond": 1574.2857142857144,
+            "cpuTimeMs": 48,
+            "cpuPercent": 13.714285714285715,
+            "memoryDelta": -798688,
+            "memoryPeak": 456,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 551,
+            "itemsWithTrends": 100
+          }
+        ]
+      },
+      "200": {
+        "testName": "trends_only",
+        "batchSize": 200,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 208.13458089007955,
+          "min": 189.75332068311195,
+          "max": 232.28803716608596,
+          "stdDev": 14.376294180182505
+        },
+        "cpuTimeMs": {
+          "mean": 40.4,
+          "min": 31,
+          "max": 47
+        },
+        "cpuPercent": {
+          "mean": 4.219573893812455,
+          "min": 3.0693069306930694,
+          "max": 5.458768873403019
+        },
+        "memoryDelta": {
+          "mean": 585305.6,
+          "min": -2545440,
+          "max": 4563352
+        },
+        "queryCount": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "queryTimeMs": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "rawResults": [
+          {
+            "testName": "trends_only",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.054,
+            "itemsPerSecond": 189.75332068311195,
+            "trendsPerSecond": 1170.7779886148007,
+            "cpuTimeMs": 46,
+            "cpuPercent": 4.364326375711575,
+            "memoryDelta": -2545440,
+            "memoryPeak": 0,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1234,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 0.861,
+            "itemsPerSecond": 232.28803716608596,
+            "trendsPerSecond": 1433.2171893147504,
+            "cpuTimeMs": 47,
+            "cpuPercent": 5.458768873403019,
+            "memoryDelta": 4326888,
+            "memoryPeak": 3684,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1234,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 0.949,
+            "itemsPerSecond": 210.7481559536354,
+            "trendsPerSecond": 1300.3161222339306,
+            "cpuTimeMs": 47,
+            "cpuPercent": 4.952581664910432,
+            "memoryDelta": -2123680,
+            "memoryPeak": 1028,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1234,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.01,
+            "itemsPerSecond": 198.01980198019803,
+            "trendsPerSecond": 1221.7821782178219,
+            "cpuTimeMs": 31,
+            "cpuPercent": 3.0693069306930694,
+            "memoryDelta": -1294592,
+            "memoryPeak": 0,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1234,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 0.953,
+            "itemsPerSecond": 209.86358866736623,
+            "trendsPerSecond": 1294.8583420776497,
+            "cpuTimeMs": 31,
+            "cpuPercent": 3.252885624344177,
+            "memoryDelta": 4563352,
+            "memoryPeak": 0,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1234,
+            "itemsWithTrends": 200
+          }
+        ]
+      },
+      "300": {
+        "testName": "trends_only",
+        "batchSize": 300,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 242.52741749817613,
+          "min": 206.7539627842867,
+          "max": 274.7252747252747,
+          "stdDev": 23.078957114504323
+        },
+        "cpuTimeMs": {
+          "mean": 59.4,
+          "min": 16,
+          "max": 125
+        },
+        "cpuPercent": {
+          "mean": 4.933845443317557,
+          "min": 1.1026878015161956,
+          "max": 10.638297872340425
+        },
+        "memoryDelta": {
+          "mean": 561468.8,
+          "min": -3644944,
+          "max": 3446384
+        },
+        "queryCount": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "queryTimeMs": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "rawResults": [
+          {
+            "testName": "trends_only",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.451,
+            "itemsPerSecond": 206.7539627842867,
+            "trendsPerSecond": 1195.037904893177,
+            "cpuTimeMs": 16,
+            "cpuPercent": 1.1026878015161956,
+            "memoryDelta": -3644944,
+            "memoryPeak": 60,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1734,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.307,
+            "itemsPerSecond": 229.53328232593728,
+            "trendsPerSecond": 1326.7023718439175,
+            "cpuTimeMs": 31,
+            "cpuPercent": 2.3718439173680186,
+            "memoryDelta": 3446384,
+            "memoryPeak": 228,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1734,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.092,
+            "itemsPerSecond": 274.7252747252747,
+            "trendsPerSecond": 1587.9120879120878,
+            "cpuTimeMs": 31,
+            "cpuPercent": 2.838827838827839,
+            "memoryDelta": 2069384,
+            "memoryPeak": 1632,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1734,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.175,
+            "itemsPerSecond": 255.3191489361702,
+            "trendsPerSecond": 1475.7446808510638,
+            "cpuTimeMs": 125,
+            "cpuPercent": 10.638297872340425,
+            "memoryDelta": -1237592,
+            "memoryPeak": 136,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1734,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.218,
+            "itemsPerSecond": 246.30541871921181,
+            "trendsPerSecond": 1423.6453201970444,
+            "cpuTimeMs": 94,
+            "cpuPercent": 7.717569786535304,
+            "memoryDelta": 2174112,
+            "memoryPeak": 8960,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1734,
+            "itemsWithTrends": 288
+          }
+        ]
+      },
+      "500": {
+        "testName": "trends_only",
+        "batchSize": 500,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 341.98341294559384,
+          "min": 304.50669914738125,
+          "max": 406.8348250610252,
+          "stdDev": 36.910548637128194
+        },
+        "cpuTimeMs": {
+          "mean": 59.2,
+          "min": 31,
+          "max": 78
+        },
+        "cpuPercent": {
+          "mean": 4.067620925099898,
+          "min": 1.9570707070707067,
+          "max": 6.265256305939788
+        },
+        "memoryDelta": {
+          "mean": 2889820.8,
+          "min": -2923024,
+          "max": 11197248
+        },
+        "queryCount": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "queryTimeMs": {
+          "mean": 0,
+          "min": 0,
+          "max": 0
+        },
+        "rawResults": [
+          {
+            "testName": "trends_only",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 1.536,
+            "itemsPerSecond": 325.5208333333333,
+            "trendsPerSecond": 1126.953125,
+            "cpuTimeMs": 78,
+            "cpuPercent": 5.078125,
+            "memoryDelta": -2107160,
+            "memoryPeak": 4500,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1731,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 1.584,
+            "itemsPerSecond": 315.65656565656565,
+            "trendsPerSecond": 1092.8030303030303,
+            "cpuTimeMs": 31,
+            "cpuPercent": 1.9570707070707067,
+            "memoryDelta": -2493248,
+            "memoryPeak": 1052,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1731,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 1.642,
+            "itemsPerSecond": 304.50669914738125,
+            "trendsPerSecond": 1054.202192448234,
+            "cpuTimeMs": 78,
+            "cpuPercent": 4.750304506699147,
+            "memoryDelta": 11197248,
+            "memoryPeak": 216,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1731,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 1.399,
+            "itemsPerSecond": 357.39814152966403,
+            "trendsPerSecond": 1237.3123659756968,
+            "cpuTimeMs": 32,
+            "cpuPercent": 2.28734810578985,
+            "memoryDelta": 10775288,
+            "memoryPeak": 368,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1731,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "trends_only",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 1.229,
+            "itemsPerSecond": 406.8348250610252,
+            "trendsPerSecond": 1408.4621643612693,
+            "cpuTimeMs": 77,
+            "cpuPercent": 6.265256305939788,
+            "memoryDelta": -2923024,
+            "memoryPeak": 1084,
+            "queryCount": 0,
+            "queryTimeMs": 0,
+            "trendsCalculated": 1731,
+            "itemsWithTrends": 478
+          }
+        ]
+      }
+    },
+    "full_update": {
+      "50": {
+        "testName": "full_update",
+        "batchSize": 50,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 145.25221939779362,
+          "min": 131.92612137203167,
+          "max": 157.2327044025157,
+          "stdDev": 9.797367722068426
+        },
+        "cpuTimeMs": {
+          "mean": 84.4,
+          "min": 62,
+          "max": 126
+        },
+        "cpuPercent": {
+          "mean": 24.665287132984194,
+          "min": 17.663817663817667,
+          "max": 39.62264150943396
+        },
+        "memoryDelta": {
+          "mean": 363632,
+          "min": -4096,
+          "max": 1156248
+        },
+        "queryCount": {
+          "mean": 8,
+          "min": 8,
+          "max": 8
+        },
+        "queryTimeMs": {
+          "mean": 85.8,
+          "min": 80,
+          "max": 92
+        },
+        "rawResults": [
+          {
+            "testName": "full_update",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.318,
+            "itemsPerSecond": 157.2327044025157,
+            "trendsPerSecond": 569.1823899371069,
+            "cpuTimeMs": 126,
+            "cpuPercent": 39.62264150943396,
+            "memoryDelta": 1156248,
+            "memoryPeak": 8860,
+            "queryCount": 8,
+            "queryTimeMs": 91,
+            "trendsCalculated": 181,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.36,
+            "itemsPerSecond": 138.88888888888889,
+            "trendsPerSecond": 502.77777777777777,
+            "cpuTimeMs": 93,
+            "cpuPercent": 25.833333333333336,
+            "memoryDelta": 419688,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 92,
+            "trendsCalculated": 181,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.321,
+            "itemsPerSecond": 155.76323987538942,
+            "trendsPerSecond": 563.8629283489097,
+            "cpuTimeMs": 63,
+            "cpuPercent": 19.626168224299064,
+            "memoryDelta": 168024,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 80,
+            "trendsCalculated": 181,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.351,
+            "itemsPerSecond": 142.45014245014247,
+            "trendsPerSecond": 515.6695156695157,
+            "cpuTimeMs": 62,
+            "cpuPercent": 17.663817663817667,
+            "memoryDelta": 78296,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 84,
+            "trendsCalculated": 181,
+            "itemsWithTrends": 50
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 50,
+            "itemCount": 50,
+            "elapsedTime": 0.379,
+            "itemsPerSecond": 131.92612137203167,
+            "trendsPerSecond": 477.5725593667546,
+            "cpuTimeMs": 78,
+            "cpuPercent": 20.580474934036943,
+            "memoryDelta": -4096,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 82,
+            "trendsCalculated": 181,
+            "itemsWithTrends": 50
+          }
+        ]
+      },
+      "100": {
+        "testName": "full_update",
+        "batchSize": 100,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 214.3613009426127,
+          "min": 197.62845849802372,
+          "max": 228.83295194508008,
+          "stdDev": 13.495888765517993
+        },
+        "cpuTimeMs": {
+          "mean": 100.2,
+          "min": 78,
+          "max": 156
+        },
+        "cpuPercent": {
+          "mean": 21.11757012577833,
+          "min": 17.48878923766816,
+          "max": 30.8300395256917
+        },
+        "memoryDelta": {
+          "mean": -421193.6,
+          "min": -5522144,
+          "max": 1757656
+        },
+        "queryCount": {
+          "mean": 8,
+          "min": 8,
+          "max": 8
+        },
+        "queryTimeMs": {
+          "mean": 125.2,
+          "min": 113,
+          "max": 138
+        },
+        "rawResults": [
+          {
+            "testName": "full_update",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.506,
+            "itemsPerSecond": 197.62845849802372,
+            "trendsPerSecond": 717.3913043478261,
+            "cpuTimeMs": 156,
+            "cpuPercent": 30.8300395256917,
+            "memoryDelta": 1646696,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 138,
+            "trendsCalculated": 363,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.504,
+            "itemsPerSecond": 198.4126984126984,
+            "trendsPerSecond": 720.2380952380952,
+            "cpuTimeMs": 110,
+            "cpuPercent": 21.825396825396826,
+            "memoryDelta": 63720,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 134,
+            "trendsCalculated": 363,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.446,
+            "itemsPerSecond": 224.2152466367713,
+            "trendsPerSecond": 813.9013452914799,
+            "cpuTimeMs": 78,
+            "cpuPercent": 17.48878923766816,
+            "memoryDelta": -5522144,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 113,
+            "trendsCalculated": 363,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.437,
+            "itemsPerSecond": 228.83295194508008,
+            "trendsPerSecond": 830.6636155606408,
+            "cpuTimeMs": 78,
+            "cpuPercent": 17.84897025171625,
+            "memoryDelta": 1757656,
+            "memoryPeak": 10256,
+            "queryCount": 8,
+            "queryTimeMs": 117,
+            "trendsCalculated": 363,
+            "itemsWithTrends": 100
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 100,
+            "itemCount": 100,
+            "elapsedTime": 0.449,
+            "itemsPerSecond": 222.71714922048997,
+            "trendsPerSecond": 808.4632516703786,
+            "cpuTimeMs": 79,
+            "cpuPercent": 17.59465478841871,
+            "memoryDelta": -51896,
+            "memoryPeak": 14880,
+            "queryCount": 8,
+            "queryTimeMs": 124,
+            "trendsCalculated": 363,
+            "itemsWithTrends": 100
+          }
+        ]
+      },
+      "200": {
+        "testName": "full_update",
+        "batchSize": 200,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 159.77473665120965,
+          "min": 132.36267372600926,
+          "max": 171.67381974248926,
+          "stdDev": 14.482285259983025
+        },
+        "cpuTimeMs": {
+          "mean": 128,
+          "min": 109,
+          "max": 156
+        },
+        "cpuPercent": {
+          "mean": 10.25090838114204,
+          "min": 8.272667107875579,
+          "max": 13.142375737152486
+        },
+        "memoryDelta": {
+          "mean": -2021129.6,
+          "min": -26786248,
+          "max": 8988208
+        },
+        "queryCount": {
+          "mean": 8,
+          "min": 8,
+          "max": 8
+        },
+        "queryTimeMs": {
+          "mean": 207.8,
+          "min": 202,
+          "max": 216
+        },
+        "rawResults": [
+          {
+            "testName": "full_update",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.187,
+            "itemsPerSecond": 168.49199663016006,
+            "trendsPerSecond": 631.0025273799495,
+            "cpuTimeMs": 140,
+            "cpuPercent": 11.794439764111205,
+            "memoryDelta": -1354712,
+            "memoryPeak": 6668,
+            "queryCount": 8,
+            "queryTimeMs": 212,
+            "trendsCalculated": 749,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.187,
+            "itemsPerSecond": 168.49199663016006,
+            "trendsPerSecond": 631.0025273799495,
+            "cpuTimeMs": 156,
+            "cpuPercent": 13.142375737152486,
+            "memoryDelta": 8988208,
+            "memoryPeak": 1856,
+            "queryCount": 8,
+            "queryTimeMs": 203,
+            "trendsCalculated": 749,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.165,
+            "itemsPerSecond": 171.67381974248926,
+            "trendsPerSecond": 642.9184549356223,
+            "cpuTimeMs": 110,
+            "cpuPercent": 9.44206008583691,
+            "memoryDelta": 8952968,
+            "memoryPeak": 744,
+            "queryCount": 8,
+            "queryTimeMs": 216,
+            "trendsCalculated": 749,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.267,
+            "itemsPerSecond": 157.8531965272297,
+            "trendsPerSecond": 591.1602209944751,
+            "cpuTimeMs": 109,
+            "cpuPercent": 8.602999210734017,
+            "memoryDelta": -26786248,
+            "memoryPeak": 23588,
+            "queryCount": 8,
+            "queryTimeMs": 206,
+            "trendsCalculated": 749,
+            "itemsWithTrends": 200
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 200,
+            "itemCount": 200,
+            "elapsedTime": 1.511,
+            "itemsPerSecond": 132.36267372600926,
+            "trendsPerSecond": 495.6982131039047,
+            "cpuTimeMs": 125,
+            "cpuPercent": 8.272667107875579,
+            "memoryDelta": 94136,
+            "memoryPeak": 24432,
+            "queryCount": 8,
+            "queryTimeMs": 202,
+            "trendsCalculated": 749,
+            "itemsWithTrends": 200
+          }
+        ]
+      },
+      "300": {
+        "testName": "full_update",
+        "batchSize": 300,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 178.14561777751652,
+          "min": 161.20365394948954,
+          "max": 211.118930330753,
+          "stdDev": 18.945317177859447
+        },
+        "cpuTimeMs": {
+          "mean": 206.2,
+          "min": 172,
+          "max": 234
+        },
+        "cpuPercent": {
+          "mean": 12.251864459437538,
+          "min": 9.497515184980672,
+          "max": 15.411681914144967
+        },
+        "memoryDelta": {
+          "mean": 7269646.4,
+          "min": -20705072,
+          "max": 27613816
+        },
+        "queryCount": {
+          "mean": 8,
+          "min": 8,
+          "max": 8
+        },
+        "queryTimeMs": {
+          "mean": 328.6,
+          "min": 291,
+          "max": 390
+        },
+        "rawResults": [
+          {
+            "testName": "full_update",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.598,
+            "itemsPerSecond": 187.73466833541926,
+            "trendsPerSecond": 665.206508135169,
+            "cpuTimeMs": 188,
+            "cpuPercent": 11.76470588235294,
+            "memoryDelta": 27613816,
+            "memoryPeak": 5572,
+            "queryCount": 8,
+            "queryTimeMs": 298,
+            "trendsCalculated": 1063,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.421,
+            "itemsPerSecond": 211.118930330753,
+            "trendsPerSecond": 748.0647431386348,
+            "cpuTimeMs": 219,
+            "cpuPercent": 15.411681914144967,
+            "memoryDelta": 24357992,
+            "memoryPeak": 8848,
+            "queryCount": 8,
+            "queryTimeMs": 291,
+            "trendsCalculated": 1063,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.861,
+            "itemsPerSecond": 161.20365394948954,
+            "trendsPerSecond": 571.1982804943578,
+            "cpuTimeMs": 218,
+            "cpuPercent": 11.714132186996238,
+            "memoryDelta": -20157720,
+            "memoryPeak": 1020,
+            "queryCount": 8,
+            "queryTimeMs": 390,
+            "trendsCalculated": 1063,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.811,
+            "itemsPerSecond": 165.65433462175594,
+            "trendsPerSecond": 958.0342352291552,
+            "cpuTimeMs": 172,
+            "cpuPercent": 9.497515184980672,
+            "memoryDelta": 25239216,
+            "memoryPeak": 7144,
+            "queryCount": 8,
+            "queryTimeMs": 318,
+            "trendsCalculated": 1735,
+            "itemsWithTrends": 288
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 300,
+            "itemCount": 300,
+            "elapsedTime": 1.818,
+            "itemsPerSecond": 165.016501650165,
+            "trendsPerSecond": 954.3454345434543,
+            "cpuTimeMs": 234,
+            "cpuPercent": 12.871287128712872,
+            "memoryDelta": -20705072,
+            "memoryPeak": 856,
+            "queryCount": 8,
+            "queryTimeMs": 346,
+            "trendsCalculated": 1735,
+            "itemsWithTrends": 288
+          }
+        ]
+      },
+      "500": {
+        "testName": "full_update",
+        "batchSize": 500,
+        "iterations": 5,
+        "itemsPerSecond": {
+          "mean": 218.09770730802853,
+          "min": 147.7104874446086,
+          "max": 275.78599007170436,
+          "stdDev": 41.27617942168853
+        },
+        "cpuTimeMs": {
+          "mean": 372,
+          "min": 328,
+          "max": 469
+        },
+        "cpuPercent": {
+          "mean": 16.172332549262592,
+          "min": 10.635155096011816,
+          "max": 20.80745341614907
+        },
+        "memoryDelta": {
+          "mean": 1857166.4,
+          "min": -23431872,
+          "max": 22308880
+        },
+        "queryCount": {
+          "mean": 8,
+          "min": 8,
+          "max": 8
+        },
+        "queryTimeMs": {
+          "mean": 520,
+          "min": 440,
+          "max": 573
+        },
+        "rawResults": [
+          {
+            "testName": "full_update",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 3.385,
+            "itemsPerSecond": 147.7104874446086,
+            "trendsPerSecond": 820.9748892171344,
+            "cpuTimeMs": 360,
+            "cpuPercent": 10.635155096011816,
+            "memoryDelta": 22308880,
+            "memoryPeak": 3672,
+            "queryCount": 8,
+            "queryTimeMs": 573,
+            "trendsCalculated": 2779,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 2.254,
+            "itemsPerSecond": 221.82786157941436,
+            "trendsPerSecond": 1232.9192546583852,
+            "cpuTimeMs": 469,
+            "cpuPercent": 20.80745341614907,
+            "memoryDelta": -23431872,
+            "memoryPeak": 10708,
+            "queryCount": 8,
+            "queryTimeMs": 534,
+            "trendsCalculated": 2779,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 1.813,
+            "itemsPerSecond": 275.78599007170436,
+            "trendsPerSecond": 1532.818532818533,
+            "cpuTimeMs": 328,
+            "cpuPercent": 18.09156094870381,
+            "memoryDelta": 10504960,
+            "memoryPeak": 5676,
+            "queryCount": 8,
+            "queryTimeMs": 440,
+            "trendsCalculated": 2779,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 2.347,
+            "itemsPerSecond": 213.0379207498935,
+            "trendsPerSecond": 1184.0647635279079,
+            "cpuTimeMs": 343,
+            "cpuPercent": 14.614401363442692,
+            "memoryDelta": -10138320,
+            "memoryPeak": 1640,
+            "queryCount": 8,
+            "queryTimeMs": 532,
+            "trendsCalculated": 2779,
+            "itemsWithTrends": 478
+          },
+          {
+            "testName": "full_update",
+            "batchSize": 500,
+            "itemCount": 500,
+            "elapsedTime": 2.154,
+            "itemsPerSecond": 232.12627669452183,
+            "trendsPerSecond": 1290.1578458681524,
+            "cpuTimeMs": 360,
+            "cpuPercent": 16.71309192200557,
+            "memoryDelta": 10042184,
+            "memoryPeak": 0,
+            "queryCount": 8,
+            "queryTimeMs": 521,
+            "trendsCalculated": 2779,
+            "itemsWithTrends": 478
+          }
+        ]
+      }
+    }
+  }
+}

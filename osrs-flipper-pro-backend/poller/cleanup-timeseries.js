@@ -1,38 +1,69 @@
+require("dotenv").config();
 const db = require("../db/db");
 
 const CONFIG = {
     "5m": {
         table: "price_5m",
-        retentionHours: 24,
+        intervalSeconds: 300,
+        // Used for 12h and 24h graphs. Longest is 24h, so need 24h + 5m (one extra granularity step)
+        retentionHours: 24 + (5 / 60), // 24.083 hours
         bufferSeconds: 300
     },
     "1h": {
         table: "price_1h",
-        retentionHours: 24 * 7,
+        intervalSeconds: 3600,
+        // Used for 1w graph. Need 1w + 1h (one extra granularity step)
+        retentionHours: (24 * 7) + 1, // 169 hours
         bufferSeconds: 3600
     },
     "6h": {
         table: "price_6h",
-        retentionHours: 24 * 30,
+        intervalSeconds: 21600,
+        // Used for 1mo graph. Need 1mo + 6h (one extra granularity step)
+        retentionHours: (24 * 30) + 6, // 726 hours
         bufferSeconds: 21600
     },
     "24h": {
         table: "price_24h",
-        retentionHours: 24 * 365,
+        intervalSeconds: 86400,
+        // Used for 3mo and 1y graphs. Longest is 1y, so need 1y + 24h (one extra granularity step)
+        retentionHours: (24 * 365) + 24, // 8784 hours
         bufferSeconds: 86400
     }
 };
 
 async function cleanupGranularity(granularity) {
     const cfg = CONFIG[granularity];
-    const cutoff = Math.floor(Date.now() / 1000) - (cfg.retentionHours * 3600 + cfg.bufferSeconds);
+    // Get the latest timestamp from the database to use as the reference point
+    // This ensures we keep data relative to the actual latest data, not "now"
+    const { rows: latestRows } = await db.query(`SELECT MAX(timestamp) as latest FROM ${cfg.table}`);
+    const latestTimestamp = latestRows[0]?.latest;
+    
+    // If no data exists, nothing to clean
+    if (!latestTimestamp) {
+        console.log(`🧹 [${granularity}] No data to clean`);
+        return;
+    }
+    
+    // Calculate cutoff based on the latest timestamp in the database, not "now"
+    // This ensures we keep data that's within retention relative to the actual latest data point
+    const retentionSeconds = cfg.retentionHours * 3600 + cfg.bufferSeconds;
+    const rawCutoff = latestTimestamp - retentionSeconds;
+    
+    // Align cutoff down to the nearest interval boundary to ensure we don't delete
+    // timestamps that are still within the retention window
+    const alignedCutoff = Math.floor(rawCutoff / cfg.intervalSeconds) * cfg.intervalSeconds;
+    
+    // Subtract one more interval to ensure we don't delete the last point that's still
+    // within the retention window (this accounts for the fact that timestamps are at END of intervals)
+    const safeCutoff = alignedCutoff - cfg.intervalSeconds;
 
     const { rowCount } = await db.query(
         `DELETE FROM ${cfg.table} WHERE timestamp < $1`,
-        [cutoff]
+        [safeCutoff]
     );
 
-    console.log(`🧹 [${granularity}] Deleted ${rowCount} rows older than ${cfg.retentionHours}h + buffer (cutoff: ${cutoff})`);
+    console.log(`🧹 [${granularity}] Deleted ${rowCount} rows older than ${cfg.retentionHours}h + buffer from latest (${latestTimestamp}) (cutoff: ${safeCutoff}, aligned: ${alignedCutoff}, raw: ${rawCutoff})`);
 }
 
 async function cleanupLatest() {

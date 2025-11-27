@@ -163,3 +163,5 @@ Each time-series table (`price_5m`, `price_1h`, etc.) contains:
 - Historical data can be queried directly from time-series tables for charts
 - Trend calculations compare mid-price (avg of high and low) between time periods
 
+
+

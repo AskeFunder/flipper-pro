@@ -1,3 +1,4 @@
+require("dotenv").config();
 const db = require("../db/db");
 const { isBackfillRunning, createLock, removeLock, setupLockCleanup } = require("./lock-utils");
 const taxExemptItems = require("../config/tax-exempt-items");

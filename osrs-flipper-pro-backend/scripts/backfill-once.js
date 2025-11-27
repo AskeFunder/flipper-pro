@@ -9,25 +9,29 @@ const HEADERS = {
 const CONFIG = {
     "5m": {
         intervalSeconds: 300,
-        retentionHours: 24,
+        // Used for 12h and 24h graphs. Longest is 24h, so need 24h + 5m (one extra granularity step)
+        retentionHours: 24 + (5 / 60), // 24.083 hours
         endpoint: "5m",
         table: "price_5m"
     },
     "1h": {
         intervalSeconds: 3600,
-        retentionHours: 24 * 7,
+        // Used for 1w graph. Need 1w + 1h (one extra granularity step)
+        retentionHours: (24 * 7) + 1, // 169 hours
         endpoint: "1h",
         table: "price_1h"
     },
     "6h": {
         intervalSeconds: 21600,
-        retentionHours: 24 * 30,
+        // Used for 1mo graph. Need 1mo + 6h (one extra granularity step)
+        retentionHours: (24 * 30) + 6, // 726 hours
         endpoint: "6h",
         table: "price_6h"
     },
     "24h": {
         intervalSeconds: 86400,
-        retentionHours: 24 * 365,
+        // Used for 3mo and 1y graphs. Longest is 1y, so need 1y + 24h (one extra granularity step)
+        retentionHours: (24 * 365) + 24, // 8784 hours
         endpoint: "24h",
         table: "price_24h"
     }
@@ -42,13 +46,33 @@ function delay(ms) {
 function getExpectedTimestamps(intervalSeconds, retentionHours) {
     const now = Math.floor(Date.now() / 1000);
     const delayMargin = 60;
+    // Align now to the interval boundary
     const alignedNow = now - (now % intervalSeconds);
-    const end = alignedNow - delayMargin;
-    const start = now - retentionHours * 3600;
+    // Most recent complete interval is one interval before alignedNow
+    // We don't need delayMargin here since we're already one interval back
+    const end = alignedNow - intervalSeconds;
+    
+    // The retentionHours includes the extra granularity step, but we want exactly N intervals
+    // For 5m: 24.083 hours = 24h + 5m → we want 289 points (24 hours = 288 intervals)
+    // For 1h: 169 hours = 168h + 1h → we want 169 points (168 hours = 168 intervals)  
+    // For 6h: 726 hours = 720h + 6h → we want 121 points (720 hours = 120 intervals)
+    // For 24h: 8784 hours = 8760h + 24h → we want 366 points (8760 hours = 365 intervals)
+    // So we subtract the extra step to get base hours
+    const extraStepHours = intervalSeconds / 3600; // Convert interval to hours
+    const baseHours = retentionHours - extraStepHours;
+    const baseRetentionSeconds = baseHours * 3600;
+    // Calculate how many intervals this gives us
+    const numIntervals = Math.floor(baseRetentionSeconds / intervalSeconds);
+    // Start from end, go back by exactly numIntervals
+    const startCandidate = end - (numIntervals * intervalSeconds);
+    // Align start UP (towards end) to the next interval boundary
+    const remainder = startCandidate % intervalSeconds;
+    const alignedStart = remainder === 0 ? startCandidate : startCandidate + (intervalSeconds - remainder);
+    
     const timestamps = [];
 
-    for (let t = start; t <= end; t += intervalSeconds) {
-        timestamps.push(t - (t % intervalSeconds));
+    for (let t = alignedStart; t <= end; t += intervalSeconds) {
+        timestamps.push(t);
     }
 
     return timestamps;

@@ -48,3 +48,5 @@ async function checkPriceInstants(itemId) {
 const itemId = process.argv[2] || 2351;
 checkPriceInstants(parseInt(itemId, 10));
 
+
+

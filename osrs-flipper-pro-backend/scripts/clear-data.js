@@ -2,9 +2,13 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is required');
+}
+
 (async () => {
     const pool = new Pool({
-        connectionString: process.env.DATABASE_URL || 'postgres://postgres:Troldmanden6@localhost:5432/flipperpro'
+        connectionString: process.env.DATABASE_URL
     });
 
     // List all tables you want to clear

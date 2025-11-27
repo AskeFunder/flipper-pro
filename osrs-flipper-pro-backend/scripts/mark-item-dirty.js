@@ -31,3 +31,5 @@ async function markItemDirty(itemId) {
 const itemId = process.argv[2] || 8010; // Camelot teleport (tablet)
 markItemDirty(parseInt(itemId, 10));
 
+
+

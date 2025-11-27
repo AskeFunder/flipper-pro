@@ -11,7 +11,20 @@ async function testFullCanonicalUpdate() {
         const totalItems = parseInt(itemCount[0].count, 10);
         
         console.log(`\n📊 Testing full canonical update for ${totalItems} items...\n`);
-        console.log(`Batch size: 200 items per batch\n`);
+        console.log(`Marking all items as dirty for full update test...\n`);
+        
+        // Mark all items as dirty to force full update
+        const now = Math.floor(Date.now() / 1000);
+        await db.query(`
+            INSERT INTO dirty_items (item_id, touched_at)
+            SELECT id, $1 FROM items
+            ON CONFLICT (item_id) DO UPDATE SET touched_at = $1
+        `, [now]);
+        
+        const { rows: dirtyCount } = await db.query(`
+            SELECT COUNT(*)::INT AS count FROM dirty_items
+        `);
+        console.log(`✅ Marked ${dirtyCount[0].count} items as dirty\n`);
         
         const startTime = process.hrtime.bigint();
         
@@ -48,4 +61,6 @@ async function testFullCanonicalUpdate() {
 }
 
 testFullCanonicalUpdate();
+
+
 
