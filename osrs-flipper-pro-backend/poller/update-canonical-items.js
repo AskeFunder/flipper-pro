@@ -1048,39 +1048,51 @@ async function calculateBatchTrends(itemIds, now) {
                     trends.trend_24h = null;
                 }
             } else if (trendName === '1m') {
-                // For trend_1m, use first vs last point in 1m window (same as graph)
-                // The 1m graph uses price_6h data, so we use price_6h for consistency
-                const windowStart = now - windows['1m'].length; // 30 days ago
-                const windowEnd = now;
+                // For trend_1m, find the latest 6h price point within the last 6 hours,
+                // then look 30 days back from that timestamp and compare
+                const sixHoursAgo = now - 21600; // 6 hours ago
+                const thirtyDaysInSeconds = 30 * 24 * 60 * 60; // 2592000 seconds
                 
-                // Get first and last points from price_6h (what the 1m graph uses)
-                const firstLastResult = await db.query(`
-                    SELECT 
-                        (SELECT (avg_high + avg_low) / 2.0 AS mid
-                         FROM price_6h
-                         WHERE item_id = $1
-                           AND timestamp >= $2
-                           AND timestamp <= $3
-                           AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
-                         ORDER BY timestamp ASC
-                         LIMIT 1) AS first_mid,
-                        (SELECT (avg_high + avg_low) / 2.0 AS mid
-                         FROM price_6h
-                         WHERE item_id = $1
-                           AND timestamp >= $2
-                           AND timestamp <= $3
-                           AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
-                         ORDER BY timestamp DESC
-                         LIMIT 1) AS last_mid
-                `, [itemId, windowStart, windowEnd]);
+                // Get latest (most recent) price from price_6h within last 6 hours
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_6h
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND timestamp <= $3
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, sixHoursAgo, now]);
                 
-                if (firstLastResult.rows.length > 0 && 
-                    firstLastResult.rows[0].first_mid != null && 
-                    firstLastResult.rows[0].last_mid != null &&
-                    firstLastResult.rows[0].first_mid !== 0) {
-                    const firstMid = parseFloat(firstLastResult.rows[0].first_mid);
-                    const lastMid = parseFloat(firstLastResult.rows[0].last_mid);
-                    trends.trend_1m = parseFloat((100.0 * (lastMid - firstMid) / firstMid).toFixed(2));
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const thirtyDaysBeforeLatest = latestTimestamp - thirtyDaysInSeconds;
+                    
+                    // Get price from exactly 30 days before the latest datapoint
+                    // Find the closest price point to exactly 30 days back (within tolerance)
+                    const toleranceSeconds = 21600; // ±6 hours tolerance (one 6h interval)
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_6h
+                        WHERE item_id = $1
+                          AND ABS(timestamp - $2) <= $3
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY ABS(timestamp - $2) ASC, timestamp DESC
+                        LIMIT 1
+                    `, [itemId, thirtyDaysBeforeLatest, toleranceSeconds]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_1m = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_1m = null;
+                    }
                 } else {
                     trends.trend_1m = null;
                 }
@@ -1131,6 +1143,104 @@ async function calculateBatchTrends(itemIds, now) {
                     }
                 } else {
                     trends.trend_1w = null;
+                }
+            } else if (trendName === '3m') {
+                // For trend_3m, find the latest 24h price point within the last 24 hours,
+                // then look 90 days back from that timestamp and compare
+                const twentyFourHoursAgo = now - 86400; // 24 hours ago
+                const ninetyDaysInSeconds = 90 * 24 * 60 * 60; // 7776000 seconds
+                
+                // Get latest (most recent) price from price_24h within last 24 hours
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_24h
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND timestamp <= $3
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, twentyFourHoursAgo, now]);
+                
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const ninetyDaysBeforeLatest = latestTimestamp - ninetyDaysInSeconds;
+                    
+                    // Get price from exactly 90 days before the latest datapoint
+                    // Find the closest price point to exactly 90 days back (within tolerance)
+                    const toleranceSeconds = 86400; // ±24 hours tolerance (one 24h interval)
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_24h
+                        WHERE item_id = $1
+                          AND ABS(timestamp - $2) <= $3
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY ABS(timestamp - $2) ASC, timestamp DESC
+                        LIMIT 1
+                    `, [itemId, ninetyDaysBeforeLatest, toleranceSeconds]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_3m = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_3m = null;
+                    }
+                } else {
+                    trends.trend_3m = null;
+                }
+            } else if (trendName === '1y') {
+                // For trend_1y, find the latest 24h price point within the last 24 hours,
+                // then look 365 days back from that timestamp and compare
+                const twentyFourHoursAgo = now - 86400; // 24 hours ago
+                const oneYearInSeconds = 365 * 24 * 60 * 60; // 31536000 seconds
+                
+                // Get latest (most recent) price from price_24h within last 24 hours
+                const latestResult = await db.query(`
+                    SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                    FROM price_24h
+                    WHERE item_id = $1
+                      AND timestamp >= $2
+                      AND timestamp <= $3
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                `, [itemId, twentyFourHoursAgo, now]);
+                
+                if (latestResult.rows.length > 0 && latestResult.rows[0].mid != null) {
+                    const latestTimestamp = latestResult.rows[0].timestamp;
+                    const latestMid = parseFloat(latestResult.rows[0].mid);
+                    const oneYearBeforeLatest = latestTimestamp - oneYearInSeconds;
+                    
+                    // Get price from exactly 365 days before the latest datapoint
+                    // Find the closest price point to exactly 365 days back (within tolerance)
+                    const toleranceSeconds = 86400; // ±24 hours tolerance (one 24h interval)
+                    const previousResult = await db.query(`
+                        SELECT timestamp, (avg_high + avg_low) / 2.0 AS mid
+                        FROM price_24h
+                        WHERE item_id = $1
+                          AND ABS(timestamp - $2) <= $3
+                          AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                        ORDER BY ABS(timestamp - $2) ASC, timestamp DESC
+                        LIMIT 1
+                    `, [itemId, oneYearBeforeLatest, toleranceSeconds]);
+                    
+                    if (previousResult.rows.length > 0 && 
+                        previousResult.rows[0].mid != null &&
+                        previousResult.rows[0].mid !== 0) {
+                        const previousMid = parseFloat(previousResult.rows[0].mid);
+                        
+                        // Calculate trend: (current - previous) / previous * 100
+                        trends.trend_1y = parseFloat((100.0 * (latestMid - previousMid) / previousMid).toFixed(2));
+                    } else {
+                        trends.trend_1y = null;
+                    }
+                } else {
+                    trends.trend_1y = null;
                 }
             } else {
                 // For other trends, use the old method (start vs end with tolerance)
