@@ -259,10 +259,10 @@ async function testCanonicalUpdateSpeed() {
         const { rows: allItems } = await db.query(`SELECT id, name FROM items ORDER BY id`);
         console.log(`✅ Found ${allItems.length} total items\n`);
         
-        // Test scenarios - testing with optimized batch sizes and parallel processing for 1500 items/sec
-        // Focus on 1100 dirty items scenario
+        // Test scenarios - testing with CPU-optimized settings (batch 350, parallel 2 with delays)
         const scenarios = [
-            { name: "1100 Dirty Items", items: allItems.slice(0, 1100), batchSizes: [300, 400, 500], parallel: [3, 6, 8] }
+            { name: "Full Update (All Items)", items: allItems, batchSizes: [350], parallel: [2] },
+            { name: "1100 Dirty Items", items: allItems.slice(0, 1100), batchSizes: [350], parallel: [2] }
         ];
         
         for (const scenario of scenarios) {

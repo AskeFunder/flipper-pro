@@ -12,8 +12,9 @@ const { Pool } = require("pg");
 const poolConfig = {
     connectionString: process.env.DATABASE_URL || "postgres://postgres:Troldmanden6@localhost:5432/flipperpro",
     // Strategy 8: Optimized pool settings for parallel batch processing
-    // Increased to 50 to support 8-10 parallel batches (each uses ~4-5 connections)
-    max: parseInt(process.env.DB_POOL_MAX || "50", 10),
+    // Reduced to 30 to lower connection overhead while still supporting 2-3 parallel batches
+    // Each batch uses ~4-5 connections (trends + data queries), so 2 batches = ~8-10 connections
+    max: parseInt(process.env.DB_POOL_MAX || "30", 10),
     min: parseInt(process.env.DB_POOL_MIN || "2", 10),
     idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || "30000", 10),
     connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT || "2000", 10),

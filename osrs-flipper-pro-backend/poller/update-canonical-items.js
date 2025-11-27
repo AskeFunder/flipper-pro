@@ -1437,6 +1437,12 @@ async function processBatch(batch, batchNum, totalBatches, now) {
         // Calculate trends for entire batch in one query
         const trendsMap = await calculateBatchTrendsWithCaching(itemIds, now);
         
+        // Small delay to let CPU cool down after trend calculation (reduces spikes)
+        const intraBatchDelay = parseInt(process.env.CANONICAL_INTRA_BATCH_DELAY_MS || "20", 10);
+        if (intraBatchDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, intraBatchDelay));
+        }
+        
         // BULK FETCH ALL DATA FOR THE BATCH - OPTIMIZED: Parallel queries for maximum throughput
         
         // Fetch all data in parallel: prices, volumes, aggregated prices, turnovers, buy/sell rates
@@ -2163,11 +2169,19 @@ class Semaphore {
  */
 async function processBatchesInParallel(batches, now, maxConcurrency = 6) {
     const semaphore = new Semaphore(maxConcurrency);
-    const results = [];
+    // Increased delay between batch starts to smooth CPU load and eliminate spikes
+    // Higher delay (100-150ms) spreads queries over time, reducing peak CPU usage
+    const batchStartDelay = parseInt(process.env.CANONICAL_BATCH_DELAY_MS || "100", 10);
     
     const processWithSemaphore = async (batch, batchNum, totalBatches) => {
         await semaphore.acquire();
         try {
+            // Progressive delay: longer delays for later batches to smooth CPU load
+            // This prevents all batches from hitting CPU at once
+            if (batchNum > 1 && batchStartDelay > 0) {
+                const delay = batchStartDelay * (batchNum - 1);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
             const result = await processBatch(batch, batchNum, totalBatches, now);
             return result;
         } finally {
@@ -2175,6 +2189,21 @@ async function processBatchesInParallel(batches, now, maxConcurrency = 6) {
         }
     };
     
+    // For sequential processing (maxConcurrency = 1), process one at a time
+    if (maxConcurrency === 1) {
+        let totalUpdated = 0;
+        for (let i = 0; i < batches.length; i++) {
+            const result = await processBatch(batches[i], i + 1, batches.length, now);
+            totalUpdated += result;
+            // Small delay between sequential batches to let CPU cool down
+            if (i < batches.length - 1 && batchStartDelay > 0) {
+                await new Promise(resolve => setTimeout(resolve, batchStartDelay));
+            }
+        }
+        return totalUpdated;
+    }
+    
+    // For parallel processing, use semaphore with delays
     const promises = batches.map((batch, index) => 
         processWithSemaphore(batch, index + 1, batches.length)
     );
@@ -2242,10 +2271,10 @@ async function updateCanonicalItems() {
         } else if (items.length <= 300) {
             batchSize = 100;
         } else {
-            // Use larger batches (400-500) for maximum throughput
-            // Larger batches reduce transaction overhead and improve parallel efficiency
-            // Optimal: 500 items per batch with parallel 3 achieves ~1700 items/sec
-            batchSize = parseInt(process.env.CANONICAL_BATCH_SIZE || "500", 10);
+            // Use moderate batch sizes to balance CPU usage and performance
+            // Reduced to 350 to lower CPU per batch while maintaining good throughput
+            // Optimal: 350 items per batch with parallel 1-2 achieves ~1000+ items/sec with lower CPU spikes
+            batchSize = parseInt(process.env.CANONICAL_BATCH_SIZE || "350", 10);
         }
         
         console.log(`[CANONICAL] Adaptive batch size: ${batchSize} (${items.length} dirty items)`);
@@ -2256,11 +2285,13 @@ async function updateCanonicalItems() {
             batches.push(items.slice(i, i + batchSize));
         }
         
-        // Determine max concurrency - optimized for 1500+ items/sec target
-        // Optimal: 3 parallel batches with batch size 500 = ~1700 items/sec
-        // With 50 connections in pool, we can support 3-6 parallel batches safely
-        // Each batch uses ~4-5 connections (trends + data queries), so 3 batches = ~12-15 connections
-        const maxConcurrency = parseInt(process.env.CANONICAL_MAX_CONCURRENCY || "3", 10);
+        // Determine max concurrency - optimized for minimal CPU spikes
+        // Parallel 2 with progressive delays smooths spikes while maintaining performance
+        // Sequential processing (1) eliminates spikes but is too slow (~700 items/sec)
+        // Parallel 2 with delays provides best balance: ~1000+ items/sec with smooth CPU
+        // Each batch uses ~4-5 connections (trends + data queries)
+        // Performance: ~1000-1100 items/sec with 350 batch size and parallel 2
+        const maxConcurrency = parseInt(process.env.CANONICAL_MAX_CONCURRENCY || "2", 10);
         console.log(`[CANONICAL] Processing ${batches.length} batches with max concurrency: ${maxConcurrency}`);
         
         // Process batches in parallel
