@@ -10,7 +10,11 @@ const ChangelogPage = () => {
     const fetchCommits = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3001/api/changelog');
+        const API_BASE = process.env.REACT_APP_API_BASE || '';
+        if (!API_BASE) {
+          throw new Error('REACT_APP_API_BASE environment variable is required');
+        }
+        const response = await fetch(`${API_BASE}/api/changelog`);
         if (!response.ok) {
           throw new Error('Failed to fetch changelog');
         }

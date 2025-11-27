@@ -14,7 +14,11 @@ import ColumnPicker from "../components/ColumnPicker";
 import FilterBuilder from "../components/FilterBuilder";
 import { allColumns } from "../constants/column";
 
-const API_URL = "http://localhost:3001/api/items/browse";
+const API_BASE = process.env.REACT_APP_API_BASE || '';
+if (!API_BASE) {
+    console.error('REACT_APP_API_BASE environment variable is required');
+}
+const API_URL = `${API_BASE}/api/items/browse`;
 const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
 const COLUMN_SETTINGS_STORAGE_KEY = "osrs-flipper-column-settings";
 

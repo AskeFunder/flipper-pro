@@ -9,8 +9,12 @@ const { Pool } = require("pg");
  * - Set appropriate idle timeout
  * - Configure connection limits
  */
+if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is required');
+}
+
 const poolConfig = {
-    connectionString: process.env.DATABASE_URL || "postgres://postgres:Troldmanden6@localhost:5432/flipperpro",
+    connectionString: process.env.DATABASE_URL,
     // Strategy 8: Optimized pool settings for parallel batch processing
     // Reduced to 30 to lower connection overhead while still supporting 2-3 parallel batches
     // Each batch uses ~4-5 connections (trends + data queries), so 2 batches = ~8-10 connections

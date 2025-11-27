@@ -245,7 +245,10 @@ ChartJS.register({
     }
 });
 
-const API_BASE = "http://localhost:3001";
+const API_BASE = process.env.REACT_APP_API_BASE || '';
+if (!API_BASE) {
+    console.error('REACT_APP_API_BASE environment variable is required');
+}
 
 const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m', '3m', '1y'];
 
@@ -259,6 +262,16 @@ const timeOptions = [
     { label: '1Y', ms: 365 * 24 * 3600e3 + 24 * 3600e3, granularity: '24h' }, // 365 days + 24 hours
     { label: 'All', ms: 0, granularity: '24h' },
 ];
+
+// Granularity step map - extra time to pull backward for proper candle alignment
+const granularityStepByRange = {
+    '12H': 5 * 60 * 1000,      // 5m in milliseconds
+    '1D': 5 * 60 * 1000,        // 5m in milliseconds (24h = 1D)
+    '1W': 60 * 60 * 1000,       // 1h in milliseconds
+    '1M': 6 * 60 * 60 * 1000,   // 6h in milliseconds
+    '3M': 24 * 60 * 60 * 1000,  // 24h in milliseconds
+    '1Y': 24 * 60 * 60 * 1000,  // 24h in milliseconds
+};
 
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
@@ -726,36 +739,42 @@ export default function ItemDetailPage() {
     // This matches the trend calculation logic
     let filtered;
     if ((timeRange === '12H' || timeRange === '1D' || timeRange === '1W') && priceData.length > 0) {
-        // Find the latest datapoint (within last 5 minutes, matching trend calculation)
-        const fiveMinutesAgo = now - 5 * 60 * 1000;
+        // Find the actual latest datapoint (not filtered by time window to ensure stability)
         const latestDataPoint = priceData
-            .filter(p => p.ts * 1000 >= fiveMinutesAgo)
             .sort((a, b) => b.ts - a.ts)[0];
         
         if (latestDataPoint) {
             const latestTimestamp = latestDataPoint.ts * 1000;
+            
             let timeBeforeLatest;
             if (timeRange === '12H') {
-                timeBeforeLatest = latestTimestamp - 12 * 3600 * 1000;
+                // Go back exactly 12 hours from latest point
+                timeBeforeLatest = latestTimestamp - (12 * 3600 * 1000);
             } else if (timeRange === '1D') {
-                timeBeforeLatest = latestTimestamp - 24 * 3600 * 1000;
+                // Go back exactly 24 hours from latest point
+                timeBeforeLatest = latestTimestamp - (24 * 3600 * 1000);
             } else if (timeRange === '1W') {
-                timeBeforeLatest = latestTimestamp - 7 * 24 * 3600 * 1000;
+                // Go back exactly 1 week from latest point
+                timeBeforeLatest = latestTimestamp - (7 * 24 * 3600 * 1000);
             }
             
-            // Filter to show data from exactly X time before latest to latest
+            // Filter to show data from exactly X time before latest to latest (inclusive)
+            // This gives us exactly 12h/24h/1w of data points
             filtered = priceData.filter(p => {
                 const pTime = p.ts * 1000;
+                // Use >= and <= to include both endpoints
                 return pTime >= timeBeforeLatest && pTime <= latestTimestamp;
             });
         } else {
             // Fallback to normal filtering if no recent datapoint
-            const minTime = selected ? now - selected.ms : 0;
+            // Note: timestamps are already at end of interval, so we don't need to subtract granularityStep
+            const minTime = selected ? (now - selected.ms) : 0;
             filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
         }
     } else {
         // Normal filtering for other time ranges
-        const minTime = selected ? now - selected.ms : 0;
+        // Note: timestamps are already at end of interval, so we don't need to subtract granularityStep
+        const minTime = selected ? (now - selected.ms) : 0;
         filtered = priceData.filter(p => minTime === 0 || p.ts * 1000 >= minTime);
     }
 
@@ -764,7 +783,7 @@ export default function ItemDetailPage() {
     let calculatedXMin = filtered.length > 0 ? new Date(Math.min(...filtered.map(p => p.ts * 1000))) : null;
     let calculatedXMax = filtered.length > 0 ? new Date(Math.max(...filtered.map(p => p.ts * 1000))) : null;
     
-    // For 1W, adjust xMin to be exactly 7 days before latest datapoint (even if no datapoint exists there)
+    // For 1W, adjust xMin to be exactly 7 days before latest datapoint
     if (timeRange === '1W' && priceData.length > 0) {
         const fiveMinutesAgo = now - 5 * 60 * 1000;
         const latestDataPoint = priceData
@@ -773,7 +792,8 @@ export default function ItemDetailPage() {
         
         if (latestDataPoint) {
             const latestTimestamp = latestDataPoint.ts * 1000;
-            const timeBeforeLatest = latestTimestamp - 7 * 24 * 3600 * 1000;
+            // Note: timestamps are already at end of interval, so we don't need to subtract granularityStep
+            const timeBeforeLatest = latestTimestamp - (7 * 24 * 3600 * 1000);
             calculatedXMin = new Date(timeBeforeLatest);
             calculatedXMax = new Date(latestTimestamp);
         }

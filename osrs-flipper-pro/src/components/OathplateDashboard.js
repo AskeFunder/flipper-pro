@@ -27,7 +27,10 @@ ChartJS.register(
     Tooltip
 );
 
-const API_BASE = "http://localhost:3001";
+const API_BASE = process.env.REACT_APP_API_BASE || '';
+if (!API_BASE) {
+    console.error('REACT_APP_API_BASE environment variable is required');
+}
 const itemId = 30765;
 
 const timeOptions = [

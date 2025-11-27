@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import SearchIcon from "@mui/icons-material/Search";
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:3001';
+const API_BASE = process.env.REACT_APP_API_BASE || '';
+if (!API_BASE) {
+    console.error('REACT_APP_API_BASE environment variable is required');
+}
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
 // Module-level cache for all items

@@ -1,13 +1,17 @@
+require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
 const app = express();
 
 // 🔧 Port config
-const PORT = process.env.PORT || 3001;
+if (!process.env.PORT) {
+    throw new Error('PORT environment variable is required');
+}
+const PORT = process.env.PORT;
 
-// 🌍 Allow frontend on localhost:3002 (React dev server)
+// 🌍 Allow frontend origin from env
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: process.env.FRONTEND_ORIGIN || '*',
 }));
 
 // 🧠 Parse JSON request bodies
@@ -26,5 +30,5 @@ app.use('/api/changelog', require('./routes/changelog'));
 
 // 🚀 Start server
 app.listen(PORT, () => {
-    console.log(`✅ API running at http://localhost:${PORT}`);
+    console.log(`✅ API running on port ${PORT}`);
 });
