@@ -163,7 +163,9 @@ router.get('/latest', async (req, res) => {
 });
 
 // ─── GET /prices/chart/:granularity/:id?since=TIMESTAMP ────────────────────────
-// Returns [ { ts, high, low } ]
+// Returns [ { ts, high, low } ] (and volume for granularities other than 4h)
+// For 5m, 1h, 6h, 24h: uses price_{granularity} table with avg_high and avg_low
+// For 4h: uses price_instant_log with aggregated high/low prices
 router.get('/chart/:granularity/:id', async (req, res) => {
     const { granularity, id } = req.params;
     const valid = ['4h', '5m', '1h', '6h', '24h'];
@@ -189,6 +191,8 @@ router.get('/chart/:granularity/:id', async (req, res) => {
             `;
             ({ rows } = await db.query(sql, [itemId, since]));
         } else {
+            // For 5m, 1h, 6h, 24h: use price_{granularity} table
+            // Returns avg_high as 'high' and avg_low as 'low' for chart display
             const table = `price_${granularity}`;
             const sql = `
                 SELECT

@@ -1254,7 +1254,12 @@ async function updateCanonicalItems() {
                 }
                 
                 // 2. Fetch all volumes for the batch in parallel
-                const [vol5mRows, vol1hRows, vol6hRows, vol24hRows, vol7dRows, vol1mRows] = await Promise.all([
+                // Aggregation rules:
+                // 5m, 1h, 6h, 24h: from price_5m (aggregated from 5m)
+                // 7d (1w): from price_1h (aggregated from 1h)
+                // 1m: from price_6h (aggregated from 6h)
+                // 3m, 1y: from price_24h (aggregated from 24h)
+                const [vol5mRows, vol1hRows, vol6hRows, vol24hRows, vol7dRows, vol1mRows, vol3mRows, vol1yRows] = await Promise.all([
                     // Volume 5m (latest)
                     db.query(`
                         SELECT DISTINCT ON (item_id) item_id, volume
@@ -1283,7 +1288,7 @@ async function updateCanonicalItems() {
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
                     `, [itemIds, now - 86400]),
-                    // Volume 7d
+                    // Volume 7d (1w)
                     db.query(`
                         SELECT item_id, COALESCE(SUM(volume), 0)::BIGINT AS volume
                         FROM price_1h
@@ -1296,7 +1301,21 @@ async function updateCanonicalItems() {
                         FROM price_6h
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
-                    `, [itemIds, now - 2592000])
+                    `, [itemIds, now - 2592000]),
+                    // Volume 3m
+                    db.query(`
+                        SELECT item_id, COALESCE(SUM(volume), 0)::BIGINT AS volume
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 7776000]),
+                    // Volume 1y
+                    db.query(`
+                        SELECT item_id, COALESCE(SUM(volume), 0)::BIGINT AS volume
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 31536000])
                 ]);
                 
                 // Organize volumes by item_id
@@ -1325,21 +1344,78 @@ async function updateCanonicalItems() {
                     if (!volumesByItem.has(row.item_id)) volumesByItem.set(row.item_id, {});
                     volumesByItem.get(row.item_id).vol1m = row.volume || 0;
                 }
+                for (const row of vol3mRows.rows) {
+                    if (!volumesByItem.has(row.item_id)) volumesByItem.set(row.item_id, {});
+                    volumesByItem.get(row.item_id).vol3m = row.volume || 0;
+                }
+                for (const row of vol1yRows.rows) {
+                    if (!volumesByItem.has(row.item_id)) volumesByItem.set(row.item_id, {});
+                    volumesByItem.get(row.item_id).vol1y = row.volume || 0;
+                }
                 
                 // 3. Fetch all prices from aggregated tables
-                const [price5mRows, price1hRows] = await Promise.all([
+                // 5m, 1h: latest from their respective tables
+                // 6h, 24h: latest from their respective tables (aggregated from 5m)
+                // 1w (7d): latest from price_1h (aggregated from 1h)
+                // 1m: latest from price_6h (aggregated from 6h)
+                // 3m, 1y: latest from price_24h (aggregated from 24h)
+                const [price5mRows, price1hRows, price6hRows, price24hRows, price1wRows, price1mRows, price3mRows, price1yRows] = await Promise.all([
+                    // 5m: latest from price_5m
                     db.query(`
                         SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
                         FROM price_5m
                         WHERE item_id = ANY($1)
                         ORDER BY item_id, timestamp DESC
                     `, [itemIds]),
+                    // 1h: latest from price_1h
                     db.query(`
                         SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
                         FROM price_1h
                         WHERE item_id = ANY($1)
                         ORDER BY item_id, timestamp DESC
-                    `, [itemIds])
+                    `, [itemIds]),
+                    // 6h: latest from price_6h (aggregated from 5m)
+                    db.query(`
+                        SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
+                        FROM price_6h
+                        WHERE item_id = ANY($1)
+                        ORDER BY item_id, timestamp DESC
+                    `, [itemIds]),
+                    // 24h: latest from price_24h (aggregated from 5m)
+                    db.query(`
+                        SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
+                        FROM price_24h
+                        WHERE item_id = ANY($1)
+                        ORDER BY item_id, timestamp DESC
+                    `, [itemIds]),
+                    // 1w (7d): latest from price_1h (aggregated from 1h)
+                    db.query(`
+                        SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
+                        FROM price_1h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        ORDER BY item_id, timestamp DESC
+                    `, [itemIds, now - 604800]),
+                    // 1m: latest from price_6h (aggregated from 6h)
+                    db.query(`
+                        SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
+                        FROM price_6h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        ORDER BY item_id, timestamp DESC
+                    `, [itemIds, now - 2592000]),
+                    // 3m: latest from price_24h (aggregated from 24h)
+                    db.query(`
+                        SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        ORDER BY item_id, timestamp DESC
+                    `, [itemIds, now - 7776000]),
+                    // 1y: latest from price_24h (aggregated from 24h)
+                    db.query(`
+                        SELECT DISTINCT ON (item_id) item_id, avg_high, avg_low
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        ORDER BY item_id, timestamp DESC
+                    `, [itemIds, now - 31536000])
                 ]);
                 
                 const pricesAggByItem = new Map();
@@ -1353,6 +1429,36 @@ async function updateCanonicalItems() {
                     pricesAggByItem.get(row.item_id).price1hHigh = row.avg_high || null;
                     pricesAggByItem.get(row.item_id).price1hLow = row.avg_low || null;
                 }
+                for (const row of price6hRows.rows) {
+                    if (!pricesAggByItem.has(row.item_id)) pricesAggByItem.set(row.item_id, {});
+                    pricesAggByItem.get(row.item_id).price6hHigh = row.avg_high || null;
+                    pricesAggByItem.get(row.item_id).price6hLow = row.avg_low || null;
+                }
+                for (const row of price24hRows.rows) {
+                    if (!pricesAggByItem.has(row.item_id)) pricesAggByItem.set(row.item_id, {});
+                    pricesAggByItem.get(row.item_id).price24hHigh = row.avg_high || null;
+                    pricesAggByItem.get(row.item_id).price24hLow = row.avg_low || null;
+                }
+                for (const row of price1wRows.rows) {
+                    if (!pricesAggByItem.has(row.item_id)) pricesAggByItem.set(row.item_id, {});
+                    pricesAggByItem.get(row.item_id).price1wHigh = row.avg_high || null;
+                    pricesAggByItem.get(row.item_id).price1wLow = row.avg_low || null;
+                }
+                for (const row of price1mRows.rows) {
+                    if (!pricesAggByItem.has(row.item_id)) pricesAggByItem.set(row.item_id, {});
+                    pricesAggByItem.get(row.item_id).price1mHigh = row.avg_high || null;
+                    pricesAggByItem.get(row.item_id).price1mLow = row.avg_low || null;
+                }
+                for (const row of price3mRows.rows) {
+                    if (!pricesAggByItem.has(row.item_id)) pricesAggByItem.set(row.item_id, {});
+                    pricesAggByItem.get(row.item_id).price3mHigh = row.avg_high || null;
+                    pricesAggByItem.get(row.item_id).price3mLow = row.avg_low || null;
+                }
+                for (const row of price1yRows.rows) {
+                    if (!pricesAggByItem.has(row.item_id)) pricesAggByItem.set(row.item_id, {});
+                    pricesAggByItem.get(row.item_id).price1yHigh = row.avg_high || null;
+                    pricesAggByItem.get(row.item_id).price1yLow = row.avg_low || null;
+                }
                 
                 // 4. Fetch all turnovers for the batch in parallel
                 const midPriceExpr = `CASE 
@@ -1362,7 +1468,12 @@ async function updateCanonicalItems() {
                     ELSE NULL
                 END`;
                 
-                const [turnover5mRows, turnover1hRows, turnover6hRows, turnover24hRows, turnover7dRows, turnover1mRows] = await Promise.all([
+                // Aggregation rules:
+                // 5m, 1h, 6h, 24h: from price_5m (aggregated from 5m)
+                // 7d (1w): from price_1h (aggregated from 1h)
+                // 1m: from price_6h (aggregated from 6h)
+                // 3m, 1y: from price_24h (aggregated from 24h)
+                const [turnover5mRows, turnover1hRows, turnover6hRows, turnover24hRows, turnover7dRows, turnover1mRows, turnover3mRows, turnover1yRows] = await Promise.all([
                     // Turnover 5m
                     db.query(`
                         SELECT DISTINCT ON (item_id) item_id,
@@ -1395,7 +1506,7 @@ async function updateCanonicalItems() {
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
                     `, [itemIds, now - 86400]),
-                    // Turnover 7d
+                    // Turnover 7d (1w)
                     db.query(`
                         SELECT item_id,
                             COALESCE(SUM(${midPriceExpr} * volume), 0)::NUMERIC(20,0) AS turnover
@@ -1410,7 +1521,23 @@ async function updateCanonicalItems() {
                         FROM price_6h
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
-                    `, [itemIds, now - 2592000])
+                    `, [itemIds, now - 2592000]),
+                    // Turnover 3m
+                    db.query(`
+                        SELECT item_id,
+                            COALESCE(SUM(${midPriceExpr} * volume), 0)::NUMERIC(20,0) AS turnover
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 7776000]),
+                    // Turnover 1y
+                    db.query(`
+                        SELECT item_id,
+                            COALESCE(SUM(${midPriceExpr} * volume), 0)::NUMERIC(20,0) AS turnover
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 31536000])
                 ]);
                 
                 const turnoversByItem = new Map();
@@ -1438,9 +1565,23 @@ async function updateCanonicalItems() {
                     if (!turnoversByItem.has(row.item_id)) turnoversByItem.set(row.item_id, {});
                     turnoversByItem.get(row.item_id).turnover1m = row.turnover != null ? String(row.turnover) : '0';
                 }
+                for (const row of turnover3mRows.rows) {
+                    if (!turnoversByItem.has(row.item_id)) turnoversByItem.set(row.item_id, {});
+                    turnoversByItem.get(row.item_id).turnover3m = row.turnover != null ? String(row.turnover) : '0';
+                }
+                for (const row of turnover1yRows.rows) {
+                    if (!turnoversByItem.has(row.item_id)) turnoversByItem.set(row.item_id, {});
+                    turnoversByItem.get(row.item_id).turnover1y = row.turnover != null ? String(row.turnover) : '0';
+                }
                 
                 // 5. Fetch all buy/sell rates for the batch in parallel
-                const [bsr5mRows, bsr1hRows] = await Promise.all([
+                // Aggregation rules:
+                // 5m, 1h, 6h, 24h: from price_5m (aggregated from 5m)
+                // 1w: from price_1h (aggregated from 1h)
+                // 1m: from price_6h (aggregated from 6h)
+                // 3m, 1y: from price_24h (aggregated from 24h)
+                const [bsr5mRows, bsr1hRows, bsr6hRows, bsr24hRows, bsr1wRows, bsr1mRows, bsr3mRows, bsr1yRows] = await Promise.all([
+                    // 5m: from price_5m (last 5 minutes)
                     db.query(`
                         SELECT item_id,
                             CASE 
@@ -1451,6 +1592,7 @@ async function updateCanonicalItems() {
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
                     `, [itemIds, now - 300]),
+                    // 1h: from price_5m (last 1 hour)
                     db.query(`
                         SELECT item_id,
                             CASE 
@@ -1460,7 +1602,73 @@ async function updateCanonicalItems() {
                         FROM price_5m
                         WHERE item_id = ANY($1) AND timestamp >= $2
                         GROUP BY item_id
-                    `, [itemIds, now - 3600])
+                    `, [itemIds, now - 3600]),
+                    // 6h: from price_5m (last 6 hours)
+                    db.query(`
+                        SELECT item_id,
+                            CASE 
+                                WHEN SUM(low_volume) = 0 THEN NULL
+                                ELSE ROUND(SUM(high_volume)::numeric / NULLIF(SUM(low_volume), 0), 2)
+                            END AS ratio
+                        FROM price_5m
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 21600]),
+                    // 24h: from price_5m (last 24 hours)
+                    db.query(`
+                        SELECT item_id,
+                            CASE 
+                                WHEN SUM(low_volume) = 0 THEN NULL
+                                ELSE ROUND(SUM(high_volume)::numeric / NULLIF(SUM(low_volume), 0), 2)
+                            END AS ratio
+                        FROM price_5m
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 86400]),
+                    // 1w: from price_1h (last 7 days)
+                    db.query(`
+                        SELECT item_id,
+                            CASE 
+                                WHEN SUM(low_volume) = 0 THEN NULL
+                                ELSE ROUND(SUM(high_volume)::numeric / NULLIF(SUM(low_volume), 0), 2)
+                            END AS ratio
+                        FROM price_1h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 604800]),
+                    // 1m: from price_6h (last 30 days)
+                    db.query(`
+                        SELECT item_id,
+                            CASE 
+                                WHEN SUM(low_volume) = 0 THEN NULL
+                                ELSE ROUND(SUM(high_volume)::numeric / NULLIF(SUM(low_volume), 0), 2)
+                            END AS ratio
+                        FROM price_6h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 2592000]),
+                    // 3m: from price_24h (last 90 days)
+                    db.query(`
+                        SELECT item_id,
+                            CASE 
+                                WHEN SUM(low_volume) = 0 THEN NULL
+                                ELSE ROUND(SUM(high_volume)::numeric / NULLIF(SUM(low_volume), 0), 2)
+                            END AS ratio
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 7776000]),
+                    // 1y: from price_24h (last 365 days)
+                    db.query(`
+                        SELECT item_id,
+                            CASE 
+                                WHEN SUM(low_volume) = 0 THEN NULL
+                                ELSE ROUND(SUM(high_volume)::numeric / NULLIF(SUM(low_volume), 0), 2)
+                            END AS ratio
+                        FROM price_24h
+                        WHERE item_id = ANY($1) AND timestamp >= $2
+                        GROUP BY item_id
+                    `, [itemIds, now - 31536000])
                 ]);
                 
                 const buySellRatesByItem = new Map();
@@ -1471,6 +1679,30 @@ async function updateCanonicalItems() {
                 for (const row of bsr1hRows.rows) {
                     if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
                     buySellRatesByItem.get(row.item_id).bsr1h = row.ratio || null;
+                }
+                for (const row of bsr6hRows.rows) {
+                    if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
+                    buySellRatesByItem.get(row.item_id).bsr6h = row.ratio || null;
+                }
+                for (const row of bsr24hRows.rows) {
+                    if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
+                    buySellRatesByItem.get(row.item_id).bsr24h = row.ratio || null;
+                }
+                for (const row of bsr1wRows.rows) {
+                    if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
+                    buySellRatesByItem.get(row.item_id).bsr1w = row.ratio || null;
+                }
+                for (const row of bsr1mRows.rows) {
+                    if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
+                    buySellRatesByItem.get(row.item_id).bsr1m = row.ratio || null;
+                }
+                for (const row of bsr3mRows.rows) {
+                    if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
+                    buySellRatesByItem.get(row.item_id).bsr3m = row.ratio || null;
+                }
+                for (const row of bsr1yRows.rows) {
+                    if (!buySellRatesByItem.has(row.item_id)) buySellRatesByItem.set(row.item_id, {});
+                    buySellRatesByItem.get(row.item_id).bsr1y = row.ratio || null;
                 }
                 
                 // 6. Build bulk INSERT/UPDATE query
@@ -1512,10 +1744,17 @@ async function updateCanonicalItems() {
                         itemId, item.name, item.icon, item.members, item.limit,
                         high, low, highTs, lowTs,
                         margin, roiPercent, spreadPercent, maxProfit, maxInvestment,
-                        vols.vol5m ?? null, vols.vol1h ?? 0, vols.vol6h ?? 0, vols.vol24h ?? 0, vols.vol7d ?? 0, vols.vol1m ?? 0,
-                        pricesAgg.price5mHigh ?? null, pricesAgg.price5mLow ?? null, pricesAgg.price1hHigh ?? null, pricesAgg.price1hLow ?? null,
-                        turnovers.turnover5m ?? '0', turnovers.turnover1h ?? '0', turnovers.turnover6h ?? '0', turnovers.turnover24h ?? '0', turnovers.turnover7d ?? '0', turnovers.turnover1m ?? '0',
-                        bsr.bsr5m ?? null, bsr.bsr1h ?? null,
+                        vols.vol5m ?? null, vols.vol1h ?? 0, vols.vol6h ?? 0, vols.vol24h ?? 0, vols.vol7d ?? 0, vols.vol1m ?? 0, vols.vol3m ?? 0, vols.vol1y ?? 0,
+                        pricesAgg.price5mHigh ?? null, pricesAgg.price5mLow ?? null, 
+                        pricesAgg.price1hHigh ?? null, pricesAgg.price1hLow ?? null,
+                        pricesAgg.price6hHigh ?? null, pricesAgg.price6hLow ?? null,
+                        pricesAgg.price24hHigh ?? null, pricesAgg.price24hLow ?? null,
+                        pricesAgg.price1wHigh ?? null, pricesAgg.price1wLow ?? null,
+                        pricesAgg.price1mHigh ?? null, pricesAgg.price1mLow ?? null,
+                        pricesAgg.price3mHigh ?? null, pricesAgg.price3mLow ?? null,
+                        pricesAgg.price1yHigh ?? null, pricesAgg.price1yLow ?? null,
+                        turnovers.turnover5m ?? '0', turnovers.turnover1h ?? '0', turnovers.turnover6h ?? '0', turnovers.turnover24h ?? '0', turnovers.turnover7d ?? '0', turnovers.turnover1m ?? '0', turnovers.turnover3m ?? '0', turnovers.turnover1y ?? '0',
+                        bsr.bsr5m ?? null, bsr.bsr1h ?? null, bsr.bsr6h ?? null, bsr.bsr24h ?? null, bsr.bsr1w ?? null, bsr.bsr1m ?? null, bsr.bsr3m ?? null, bsr.bsr1y ?? null,
                         trends.trend_5m ?? null, trends.trend_1h ?? null, trends.trend_6h ?? null, trends.trend_24h ?? null,
                         trends.trend_1w ?? null, trends.trend_1m ?? null, trends.trend_3m ?? null, trends.trend_1y ?? null,
                         now
@@ -1535,9 +1774,10 @@ async function updateCanonicalItems() {
                 }
                 
                 // Bulk INSERT/UPDATE using unnest (PostgreSQL efficient bulk operation)
+                // Total columns: 5 (metadata) + 4 (prices) + 5 (calculated) + 8 (volumes) + 16 (price high/low: 8 granularities × 2) + 8 (turnovers) + 8 (buy/sell rates) + 8 (trends) + 1 (timestamp) = 63
                 const placeholders = values.map((_, i) => {
-                    const base = i * 41;
-                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14}, $${base + 15}, $${base + 16}, $${base + 17}, $${base + 18}, $${base + 19}, $${base + 20}, $${base + 21}, $${base + 22}, $${base + 23}, $${base + 24}, $${base + 25}, $${base + 26}, $${base + 27}, $${base + 28}, $${base + 29}, $${base + 30}, $${base + 31}, $${base + 32}, $${base + 33}, $${base + 34}, $${base + 35}, $${base + 36}, $${base + 37}, $${base + 38}, $${base + 39}, $${base + 40}, $${base + 41})`;
+                    const base = i * 63;
+                    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14}, $${base + 15}, $${base + 16}, $${base + 17}, $${base + 18}, $${base + 19}, $${base + 20}, $${base + 21}, $${base + 22}, $${base + 23}, $${base + 24}, $${base + 25}, $${base + 26}, $${base + 27}, $${base + 28}, $${base + 29}, $${base + 30}, $${base + 31}, $${base + 32}, $${base + 33}, $${base + 34}, $${base + 35}, $${base + 36}, $${base + 37}, $${base + 38}, $${base + 39}, $${base + 40}, $${base + 41}, $${base + 42}, $${base + 43}, $${base + 44}, $${base + 45}, $${base + 46}, $${base + 47}, $${base + 48}, $${base + 49}, $${base + 50}, $${base + 51}, $${base + 52}, $${base + 53}, $${base + 54}, $${base + 55}, $${base + 56}, $${base + 57}, $${base + 58}, $${base + 59}, $${base + 60}, $${base + 61}, $${base + 62}, $${base + 63})`;
                 }).join(', ');
                 
                 const flatParams = values.flat();
@@ -1547,10 +1787,17 @@ async function updateCanonicalItems() {
                         item_id, name, icon, members, "limit",
                         high, low, high_timestamp, low_timestamp,
                         margin, roi_percent, spread_percent, max_profit, max_investment,
-                        volume_5m, volume_1h, volume_6h, volume_24h, volume_7d, volume_1m,
-                        price_5m_high, price_5m_low, price_1h_high, price_1h_low,
-                        turnover_5m, turnover_1h, turnover_6h, turnover_24h, turnover_7d, turnover_1m,
-                        buy_sell_rate_5m, buy_sell_rate_1h,
+                        volume_5m, volume_1h, volume_6h, volume_24h, volume_7d, volume_1m, volume_3m, volume_1y,
+                        price_5m_high, price_5m_low, 
+                        price_1h_high, price_1h_low,
+                        price_6h_high, price_6h_low,
+                        price_24h_high, price_24h_low,
+                        price_1w_high, price_1w_low,
+                        price_1m_high, price_1m_low,
+                        price_3m_high, price_3m_low,
+                        price_1y_high, price_1y_low,
+                        turnover_5m, turnover_1h, turnover_6h, turnover_24h, turnover_7d, turnover_1m, turnover_3m, turnover_1y,
+                        buy_sell_rate_5m, buy_sell_rate_1h, buy_sell_rate_6h, buy_sell_rate_24h, buy_sell_rate_1w, buy_sell_rate_1m, buy_sell_rate_3m, buy_sell_rate_1y,
                         trend_5m, trend_1h, trend_6h, trend_24h, trend_1w, trend_1m, trend_3m, trend_1y,
                         timestamp_updated
                     ) VALUES ${placeholders}
@@ -1574,18 +1821,40 @@ async function updateCanonicalItems() {
                         volume_24h = EXCLUDED.volume_24h,
                         volume_7d = EXCLUDED.volume_7d,
                         volume_1m = EXCLUDED.volume_1m,
+                        volume_3m = EXCLUDED.volume_3m,
+                        volume_1y = EXCLUDED.volume_1y,
                         price_5m_high = EXCLUDED.price_5m_high,
                         price_5m_low = EXCLUDED.price_5m_low,
                         price_1h_high = EXCLUDED.price_1h_high,
                         price_1h_low = EXCLUDED.price_1h_low,
+                        price_6h_high = EXCLUDED.price_6h_high,
+                        price_6h_low = EXCLUDED.price_6h_low,
+                        price_24h_high = EXCLUDED.price_24h_high,
+                        price_24h_low = EXCLUDED.price_24h_low,
+                        price_1w_high = EXCLUDED.price_1w_high,
+                        price_1w_low = EXCLUDED.price_1w_low,
+                        price_1m_high = EXCLUDED.price_1m_high,
+                        price_1m_low = EXCLUDED.price_1m_low,
+                        price_3m_high = EXCLUDED.price_3m_high,
+                        price_3m_low = EXCLUDED.price_3m_low,
+                        price_1y_high = EXCLUDED.price_1y_high,
+                        price_1y_low = EXCLUDED.price_1y_low,
                         turnover_5m = EXCLUDED.turnover_5m,
                         turnover_1h = EXCLUDED.turnover_1h,
                         turnover_6h = EXCLUDED.turnover_6h,
                         turnover_24h = EXCLUDED.turnover_24h,
                         turnover_7d = EXCLUDED.turnover_7d,
                         turnover_1m = EXCLUDED.turnover_1m,
+                        turnover_3m = EXCLUDED.turnover_3m,
+                        turnover_1y = EXCLUDED.turnover_1y,
                         buy_sell_rate_5m = EXCLUDED.buy_sell_rate_5m,
                         buy_sell_rate_1h = EXCLUDED.buy_sell_rate_1h,
+                        buy_sell_rate_6h = EXCLUDED.buy_sell_rate_6h,
+                        buy_sell_rate_24h = EXCLUDED.buy_sell_rate_24h,
+                        buy_sell_rate_1w = EXCLUDED.buy_sell_rate_1w,
+                        buy_sell_rate_1m = EXCLUDED.buy_sell_rate_1m,
+                        buy_sell_rate_3m = EXCLUDED.buy_sell_rate_3m,
+                        buy_sell_rate_1y = EXCLUDED.buy_sell_rate_1y,
                         trend_5m = EXCLUDED.trend_5m,
                         trend_1h = EXCLUDED.trend_1h,
                         trend_6h = EXCLUDED.trend_6h,

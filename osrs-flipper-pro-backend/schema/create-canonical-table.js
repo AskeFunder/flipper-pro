@@ -40,6 +40,18 @@ CREATE TABLE IF NOT EXISTS canonical_items (
   price_5m_low BIGINT,
   price_1h_high BIGINT,
   price_1h_low BIGINT,
+  price_6h_high BIGINT,
+  price_6h_low BIGINT,
+  price_24h_high BIGINT,
+  price_24h_low BIGINT,
+  price_1w_high BIGINT,
+  price_1w_low BIGINT,
+  price_1m_high BIGINT,
+  price_1m_low BIGINT,
+  price_3m_high BIGINT,
+  price_3m_low BIGINT,
+  price_1y_high BIGINT,
+  price_1y_low BIGINT,
   
   -- Turnover (average_price × volume) - using NUMERIC to handle large values
   turnover_5m NUMERIC(20,0),
@@ -52,6 +64,12 @@ CREATE TABLE IF NOT EXISTS canonical_items (
   -- Buy/sell rate (high_volume / low_volume)
   buy_sell_rate_5m NUMERIC(10,2),
   buy_sell_rate_1h NUMERIC(10,2),
+  buy_sell_rate_6h NUMERIC(10,2),
+  buy_sell_rate_24h NUMERIC(10,2),
+  buy_sell_rate_1w NUMERIC(10,2),
+  buy_sell_rate_1m NUMERIC(10,2),
+  buy_sell_rate_3m NUMERIC(10,2),
+  buy_sell_rate_1y NUMERIC(10,2),
   
   -- Trend (percentage change over time period)
   trend_5m NUMERIC(10,2),
