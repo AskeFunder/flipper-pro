@@ -247,7 +247,7 @@ ChartJS.register({
 
 const API_BASE = "http://localhost:3001";
 
-const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m'];
+const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m', '3m', '1y'];
 
 const timeOptions = [
     { label: '4H', ms: 4 * 3600e3, granularity: '4h' },
@@ -683,50 +683,34 @@ export default function ItemDetailPage() {
         let trendKey;
         let volumeKey;
         let turnoverKey;
+        let priceHighKey;
+        let priceLowKey;
+        let buySellRateKey;
         
         if (gran === '1w') {
             trendKey = 'trend_1w';
             volumeKey = 'volume_7d';  // Database still uses 7d for volume
             turnoverKey = 'turnover_7d';  // Database still uses 7d for turnover
-        } else if (gran === '1m') {
-            trendKey = 'trend_1m';
-            volumeKey = `volume_${gran}`;
-            turnoverKey = `turnover_${gran}`;
+            priceHighKey = 'price_1w_high';
+            priceLowKey = 'price_1w_low';
+            buySellRateKey = 'buy_sell_rate_1w';
         } else {
             trendKey = `trend_${gran}`;
             volumeKey = `volume_${gran}`;
             turnoverKey = `turnover_${gran}`;
-        }
-        
-        // Debug: log when getting metrics for 5m and 6h
-        if (gran === '5m' || gran === '6h') {
-            console.log(`[ItemDetailPage] getGranularityMetrics for ${gran}:`, {
-                trendKey,
-                trendValue: canonicalData[trendKey],
-                trendValueType: typeof canonicalData[trendKey],
-                hasTrendKey: trendKey in canonicalData,
-                allTrendKeys: Object.keys(canonicalData).filter(k => k.includes('trend')),
-                itemId: canonicalData.item_id
-            });
+            priceHighKey = `price_${gran}_high`;
+            priceLowKey = `price_${gran}_low`;
+            buySellRateKey = `buy_sell_rate_${gran}`;
         }
         
         const metrics = {
             volume: canonicalData[volumeKey] != null ? canonicalData[volumeKey] : null,
             turnover: canonicalData[turnoverKey] != null ? canonicalData[turnoverKey] : null,
             trend: canonicalData[trendKey] != null ? canonicalData[trendKey] : null,
-            buy_sell_rate: canonicalData[`buy_sell_rate_${gran}`] != null ? canonicalData[`buy_sell_rate_${gran}`] : null,
-            price_high: null,
-            price_low: null,
+            buy_sell_rate: canonicalData[buySellRateKey] != null ? canonicalData[buySellRateKey] : null,
+            price_high: canonicalData[priceHighKey] != null ? canonicalData[priceHighKey] : null,
+            price_low: canonicalData[priceLowKey] != null ? canonicalData[priceLowKey] : null,
         };
-
-        // Price fields only exist for 5m and 1h
-        if (gran === '5m') {
-            metrics.price_high = canonicalData.price_5m_high || null;
-            metrics.price_low = canonicalData.price_5m_low || null;
-        } else if (gran === '1h') {
-            metrics.price_high = canonicalData.price_1h_high || null;
-            metrics.price_low = canonicalData.price_1h_low || null;
-        }
 
         return metrics;
     };
@@ -1638,18 +1622,24 @@ export default function ItemDetailPage() {
             <div style={sectionContainerStyle}>
                 <h2 style={sectionTitleStyle}>Basic (Live Market Data)</h2>
                 {basicData ? (
-                    <div style={gridStyle}>
-                        <Field label="High (Instant Sell)" value={formatPriceFull(basicData.high)} />
-                        <Field label="Low (Instant Buy)" value={formatPriceFull(basicData.low)} />
-                        <Field label="High Timestamp" value={timeAgo(basicData.high_timestamp)} />
-                        <Field label="Low Timestamp" value={timeAgo(basicData.low_timestamp)} />
-                        <Field label="Margin" value={formatColoredNumber(basicData.margin)} />
-                        <Field label="ROI %" value={formatRoi(basicData.roi_percent)} />
-                        <Field label="Spread %" value={formatRoi(basicData.spread_percent)} />
-                        <Field label="Limit" value={basicData.limit ? basicData.limit.toLocaleString() : "–"} />
-                        <Field label="Max Profit" value={formatColoredNumber(basicData.max_profit)} />
-                        <Field label="Max Investment" value={formatPriceFull(basicData.max_investment)} />
-                    </div>
+                    <>
+                        {/* Row 1: High, Low, Margin, ROI, Spread */}
+                        <div style={{ ...gridStyle, marginBottom: "24px" }}>
+                            <Field label="High (Instant Sell)" value={formatPriceFull(basicData.high)} />
+                            <Field label="Low (Instant Buy)" value={formatPriceFull(basicData.low)} />
+                            <Field label="Margin" value={formatColoredNumber(basicData.margin)} />
+                            <Field label="ROI %" value={formatRoi(basicData.roi_percent)} />
+                            <Field label="Spread %" value={formatRoi(basicData.spread_percent)} />
+                        </div>
+                        {/* Row 2: High Timestamp, Low Timestamp, Limit, Max Profit, Max Investment */}
+                        <div style={gridStyle}>
+                            <Field label="High Timestamp" value={timeAgo(basicData.high_timestamp)} />
+                            <Field label="Low Timestamp" value={timeAgo(basicData.low_timestamp)} />
+                            <Field label="Limit" value={basicData.limit ? basicData.limit.toLocaleString() : "–"} />
+                            <Field label="Max Profit" value={formatColoredNumber(basicData.max_profit)} />
+                            <Field label="Max Investment" value={formatPriceFull(basicData.max_investment)} />
+                        </div>
+                    </>
                 ) : (
                     <p>No live market data available</p>
                 )}
@@ -1722,23 +1712,6 @@ export default function ItemDetailPage() {
                         />
                     )}
                 </div>
-
-                {/* Additional trend fields (3m and 1y) - not granularity-specific */}
-                {(canonicalData.trend_3m != null || canonicalData.trend_1y != null) && (
-                    <div style={{ marginTop: "24px" }}>
-                        <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px", color: "#374151" }}>
-                            Extended Trends
-                        </h3>
-                        <div style={gridStyle}>
-                            {canonicalData.trend_3m != null && (
-                                <Field label="Trend (3m)" value={formatRoi(canonicalData.trend_3m)} />
-                            )}
-                            {canonicalData.trend_1y != null && (
-                                <Field label="Trend (1y)" value={formatRoi(canonicalData.trend_1y)} />
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
@@ -1920,13 +1893,14 @@ const sectionTitleStyle = {
 const gridStyle = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap: "20px",
+    gap: "24px",
+    padding: "8px 0",
 };
 
 const fieldStyle = {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "8px",
 };
 
 const labelStyle = {
