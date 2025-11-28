@@ -13,12 +13,14 @@ import BrowseTable from "../components/BrowseTable";
 import ColumnPicker from "../components/ColumnPicker";
 import FilterBuilder from "../components/FilterBuilder";
 import { allColumns } from "../constants/column";
+import { apiFetchJson } from "../utils/api";
 
 const API_BASE = process.env.REACT_APP_API_BASE || '';
-if (!API_BASE) {
-    console.error('REACT_APP_API_BASE environment variable is required');
-}
-const API_URL = `${API_BASE}/api/items/browse`;
+console.log('[BrowseItemsPage] REACT_APP_API_BASE from env:', process.env.REACT_APP_API_BASE);
+console.log('[BrowseItemsPage] API_BASE resolved to:', API_BASE || '(empty - using Netlify proxy)');
+// Empty API_BASE is valid when using Netlify proxy (routes through /api/*)
+const API_URL = `/api/items/browse`;
+console.log('[BrowseItemsPage] API_URL:', API_URL);
 const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
 const COLUMN_SETTINGS_STORAGE_KEY = "osrs-flipper-column-settings";
 
@@ -94,9 +96,15 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
             ...(isSearchFromSearchBar ? {} : filters),
         });
 
-        fetch(`${API_URL}?${q.toString()}`, { signal: controller.signal })
-            .then((r) => r.json())
+        const fetchUrl = `${API_URL}?${q.toString()}`;
+        console.log('[BrowseItemsPage] Fetching from:', fetchUrl);
+        console.log('[BrowseItemsPage] API_BASE:', API_BASE);
+        console.log('[BrowseItemsPage] API_URL:', API_URL);
+        
+        apiFetchJson(fetchUrl, { signal: controller.signal })
             .then((d) => {
+                console.log('[BrowseItemsPage] Response data:', d);
+                console.log('[BrowseItemsPage] Items count:', d.items?.length || 0);
                 if (!controller.signal.aborted) {
                     setItems(d.items || []);
                     setTotalPages(d.totalPages || 1);
@@ -104,7 +112,9 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                 }
             })
             .catch((e) => {
-                if (e.name !== "AbortError") console.error(e);
+                if (e.name !== "AbortError") {
+                    console.error('[BrowseItemsPage] Fetch error:', e);
+                }
             })
             .finally(() => {
                 if (!controller.signal.aborted) setLoading(false);

@@ -14,6 +14,7 @@ import {
 } from "chart.js";
 import 'chartjs-adapter-date-fns';
 import { timeAgo, formatPriceFull } from "../utils/formatting";
+import { apiFetchJson } from "../utils/api";
 
 ChartJS.register(
     LineElement,
@@ -27,10 +28,7 @@ ChartJS.register(
     Tooltip
 );
 
-const API_BASE = process.env.REACT_APP_API_BASE || '';
-if (!API_BASE) {
-    console.error('REACT_APP_API_BASE environment variable is required');
-}
+// API_BASE is now handled by apiFetch helper
 const itemId = 30765;
 
 const timeOptions = [
@@ -88,8 +86,7 @@ export default function OathplateDashboard() {
         const granularity = timestepMap[timeRange];
 
         const fetchChart = () => {
-            fetch(`${API_BASE}/api/prices/chart/${granularity}/${itemId}`)
-                .then(res => res.json())
+            apiFetchJson(`/api/prices/chart/${granularity}/${itemId}`)
                 .then(setPriceData)
                 .catch(console.error);
         };
@@ -102,7 +99,7 @@ export default function OathplateDashboard() {
     useEffect(() => {
         const fetchAll = async () => {
             try {
-                const main = await fetch(`${API_BASE}/api/prices/latest/${itemId}`).then(res => res.json());
+                const main = await apiFetchJson(`/api/prices/latest/${itemId}`);
                 setLatest(main);
 
                 const ids = [
@@ -112,7 +109,7 @@ export default function OathplateDashboard() {
                     componentIds.legs
                 ];
                 const results = await Promise.all(
-                    ids.map(id => fetch(`${API_BASE}/api/prices/latest/${id}`).then(res => res.json()))
+                    ids.map(id => apiFetchJson(`/api/prices/latest/${id}`))
                 );
 
                 setShaleHigh(results[0]?.high ?? null);
@@ -133,8 +130,7 @@ export default function OathplateDashboard() {
 
     useEffect(() => {
         const fetchRecent = () => {
-            fetch(`${API_BASE}/api/prices/recent/${itemId}`)
-                .then(res => res.json())
+            apiFetchJson(`/api/prices/recent/${itemId}`)
                 .then(setRecentTrades)
                 .catch(console.error);
         };

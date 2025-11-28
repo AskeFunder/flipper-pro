@@ -22,6 +22,7 @@ import {
     timeAgo,
 } from "../utils/formatting";
 import { taxExemptItems } from "../config/taxExemptItems";
+import { apiFetch, apiFetchJson } from "../utils/api";
 
 ChartJS.register(
     LineElement,
@@ -245,10 +246,7 @@ ChartJS.register({
     }
 });
 
-const API_BASE = process.env.REACT_APP_API_BASE || '';
-if (!API_BASE) {
-    console.error('REACT_APP_API_BASE environment variable is required');
-}
+// API_BASE is now handled by apiFetch helper
 
 const GRANULARITY_OPTIONS = ['5m', '1h', '6h', '24h', '1w', '1m', '3m', '1y'];
 
@@ -323,7 +321,7 @@ export default function ItemDetailPage() {
             try {
                 // Prefer ID lookup if available (more reliable)
                 const apiParam = numericItemId ? numericItemId : encodeURIComponent(itemNameSlug);
-                const res = await fetch(`${API_BASE}/api/items/canonical/${apiParam}`);
+                const res = await apiFetch(`/api/items/canonical/${apiParam}`);
                 if (res.ok) {
                     const data = await res.json();
                     // Debug: log trend_6h to see if it's in the response
@@ -360,7 +358,7 @@ export default function ItemDetailPage() {
 
         const fetchBasic = async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/prices/latest/${canonicalData.item_id}`);
+                const res = await apiFetch(`/api/prices/latest/${canonicalData.item_id}`);
                 if (res.ok) {
                     const data = await res.json();
                     
@@ -426,8 +424,7 @@ export default function ItemDetailPage() {
         const granularity = selected ? selected.granularity : '5m';
 
         const fetchChart = () => {
-            fetch(`${API_BASE}/api/prices/chart/${granularity}/${canonicalData.item_id}`)
-                .then(res => res.json())
+            apiFetchJson(`/api/prices/chart/${granularity}/${canonicalData.item_id}`)
                 .then(setPriceData)
                 .catch(console.error);
         };
@@ -442,8 +439,7 @@ export default function ItemDetailPage() {
         if (!canonicalData || !canonicalData.item_id) return;
 
         const fetchRecent = () => {
-            fetch(`${API_BASE}/api/prices/recent/${canonicalData.item_id}`)
-                .then(res => res.json())
+            apiFetchJson(`/api/prices/recent/${canonicalData.item_id}`)
                 .then(setRecentTrades)
                 .catch(console.error);
         };
@@ -1766,7 +1762,7 @@ function TrendField({ label, value, itemId, granularity }) {
                            granularity === '1m' ? 'trend_1m' :
                            `trend_${granularity}`;
             
-            const res = await fetch(`${API_BASE}/api/items/trend-details/${itemId}`);
+            const res = await apiFetch(`/api/items/trend-details/${itemId}`);
             if (res.ok) {
                 const data = await res.json();
                 setTooltipData(data[trendKey] || null);

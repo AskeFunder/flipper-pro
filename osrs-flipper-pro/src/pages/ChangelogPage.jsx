@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
+import { apiFetchJson } from '../utils/api';
 
 const ChangelogPage = () => {
   const [commits, setCommits] = useState([]);
@@ -10,15 +11,7 @@ const ChangelogPage = () => {
     const fetchCommits = async () => {
       try {
         setLoading(true);
-        const API_BASE = process.env.REACT_APP_API_BASE || '';
-        if (!API_BASE) {
-          throw new Error('REACT_APP_API_BASE environment variable is required');
-        }
-        const response = await fetch(`${API_BASE}/api/changelog`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch changelog');
-        }
-        const data = await response.json();
+        const data = await apiFetchJson('/api/changelog');
         setCommits(data);
         setError(null);
       } catch (err) {

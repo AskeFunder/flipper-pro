@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import SearchIcon from "@mui/icons-material/Search";
+import { apiFetchJson } from "../utils/api";
 
-const API_BASE = process.env.REACT_APP_API_BASE || '';
-if (!API_BASE) {
-    console.error('REACT_APP_API_BASE environment variable is required');
-}
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
 // Module-level cache for all items
@@ -17,11 +14,7 @@ async function getAllItems() {
     if (isLoadingCache && loadPromise) return loadPromise;
     
     isLoadingCache = true;
-    loadPromise = fetch(`${API_BASE}/api/items/all`)
-        .then(res => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-        })
+    loadPromise = apiFetchJson('/api/items/all')
         .then(data => {
             cachedItems = Array.isArray(data) ? data : [];
             isLoadingCache = false;

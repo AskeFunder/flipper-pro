@@ -1,0 +1,8 @@
+[build]
+  publish = "build"
+  command = "npm run build"
+
+# Note: API calls are made directly to the backend server (not through proxy)
+# This is necessary because Netlify redirects don't forward custom headers like X-FLIPPER-SECRET
+# CORS is configured on the backend to allow requests from https://flipper-pro.netlify.app
+
