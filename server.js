@@ -16,15 +16,15 @@ app.use(cors({
         if (!origin) {
             return callback(null, true);
         }
-        const allowedOrigins = [" https://flipper-pro.com\, \https://www.flipper-pro.com\];
- if (allowedOrigins.indexOf(origin) !== -1) {
- callback(null, true);
- } else {
- callback(new Error(\Not allowed by CORS\));
- }
- },
- methods: [\GET\],
- allowedHeaders: [\Content-Type\, \X-FLIPPER-SECRET\]
+        const allowedOrigins = ["https://flipper-pro.com", "https://www.flipper-pro.com"];
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    methods: ["GET"],
+    allowedHeaders: ["Content-Type", "X-FLIPPER-SECRET"]
 }));
 
 // 🧠 Parse JSON request bodies
