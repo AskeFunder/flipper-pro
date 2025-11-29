@@ -15,12 +15,7 @@ import FilterBuilder from "../components/FilterBuilder";
 import { allColumns } from "../constants/column";
 import { apiFetchJson } from "../utils/api";
 
-const API_BASE = process.env.REACT_APP_API_BASE || '';
-console.log('[BrowseItemsPage] REACT_APP_API_BASE from env:', process.env.REACT_APP_API_BASE);
-console.log('[BrowseItemsPage] API_BASE resolved to:', API_BASE || '(empty - using Netlify proxy)');
-// Empty API_BASE is valid when using Netlify proxy (routes through /api/*)
 const API_URL = `/api/items/browse`;
-console.log('[BrowseItemsPage] API_URL:', API_URL);
 const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
 const COLUMN_SETTINGS_STORAGE_KEY = "osrs-flipper-column-settings";
 
@@ -97,9 +92,6 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
         });
 
         const fetchUrl = `${API_URL}?${q.toString()}`;
-        console.log('[BrowseItemsPage] Fetching from:', fetchUrl);
-        console.log('[BrowseItemsPage] API_BASE:', API_BASE);
-        console.log('[BrowseItemsPage] API_URL:', API_URL);
         
         apiFetchJson(fetchUrl, { signal: controller.signal })
             .then((d) => {
