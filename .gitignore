@@ -1,0 +1,13 @@
+node_modules/
+.locks/
+.env
+*.log
+neon-export.sql
+
+
+
+
+
+
+
+
