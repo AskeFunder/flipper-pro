@@ -1,13 +1,12 @@
 /**
- * Centralized API helper for making authenticated requests to the backend
- * Automatically includes the secret header required by the API
+ * Centralized API helper for making requests to the backend
+ * Security is handled by CORS and rate limiting on the backend
  */
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:3001';
-const API_SECRET = process.env.REACT_APP_FLIPPER_SECRET || '';
 
 /**
- * Make an authenticated API request
+ * Make an API request
  * @param {string} endpoint - API endpoint (e.g., '/api/items/browse')
  * @param {RequestInit} options - Fetch options (method, body, etc.)
  * @returns {Promise<Response>}
@@ -17,7 +16,6 @@ export async function apiFetch(endpoint, options = {}) {
     
     const headers = {
         'Content-Type': 'application/json',
-        'X-FLIPPER-SECRET': API_SECRET,
         ...options.headers,
     };
 
