@@ -40,22 +40,31 @@ ChartJS.register(
 ChartJS.register({
     id: 'verticalLine',
     afterDraw: (chart) => {
-        if (chart.tooltip._active && chart.tooltip._active.length) {
-            const ctx = chart.ctx;
-            const x = chart.tooltip._active[0].element.x;
-            const topY = chart.scales.y.top;
-            const bottomY = chart.scales.y.bottom;
-            
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.lineTo(x, bottomY);
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.setLineDash([5, 5]);
-            ctx.stroke();
-            ctx.restore();
+        if (
+            !chart ||
+            !chart.tooltip ||
+            !chart.tooltip._active ||
+            chart.tooltip._active.length === 0 ||
+            !chart.scales ||
+            !chart.scales.y
+        ) {
+            return;
         }
+        
+        const ctx = chart.ctx;
+        const x = chart.tooltip._active[0].element.x;
+        const topY = chart.scales.y.top;
+        const bottomY = chart.scales.y.bottom;
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, topY);
+        ctx.lineTo(x, bottomY);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.restore();
     }
 });
 
@@ -165,9 +174,13 @@ ChartJS.register({
         }
     },
     afterDraw: (chart) => {
+        if (!chart || !chart.chartArea || !chart.ctx) {
+            return;
+        }
+        
         // Check both plugin drag state and global drag state
         const isDragging = (chart.dragZoom && chart.dragZoom.isDragging) || globalDragState.isDragging;
-        if (isDragging && chart.chartArea) {
+        if (isDragging) {
             const ctx = chart.ctx;
             let startX, endX;
             
