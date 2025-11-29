@@ -13,9 +13,18 @@ const PORT = process.env.PORT;
 // 🔒 Strict CORS - ONLY allow Netlify origin
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) {
             return callback(null, true);
+        }
+        const allowedOrigins = [" https://flipper-pro.com\, \https://www.flipper-pro.com\];
+ if (allowedOrigins.indexOf(origin) !== -1) {
+ callback(null, true);
+ } else {
+ callback(new Error(\Not allowed by CORS\));
+ }
+ },
+ methods: [\GET\],
+ allowedHeaders: [\Content-Type\, \X-FLIPPER-SECRET\]
         }
         const allowedOrigins = ["https://flipper-pro.com", "https://www.flipper-pro.com"];
         if (allowedOrigins.indexOf(origin) !== -1) {
