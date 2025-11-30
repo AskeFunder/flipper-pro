@@ -10,22 +10,31 @@ if (!process.env.PORT) {
 }
 const PORT = process.env.PORT;
 
-// 🔒 Strict CORS - ONLY allow Netlify origin
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) {
-            return callback(null, true);
-        }
-        const allowedOrigins = ["https://flipper-pro.com", "https://www.flipper-pro.com"];
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error("Not allowed by CORS"));
-        }
-    },
-    methods: ["GET"],
-    allowedHeaders: ["Content-Type", "X-FLIPPER-SECRET"]
-}));
+// 🔒 Strict CORS - Allow production and local dev origins
+const allowedOrigins = [
+    "https://flipper-pro.com",
+    "https://www.flipper-pro.com",
+    "http://localhost:3000",
+    "http://localhost:3001"
+];
+
+app.use(
+    cors({
+        origin: function (origin, callback) {
+            // Allow server-to-server & curl without Origin header
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("CORS blocked: " + origin));
+            }
+        },
+        credentials: true,
+        methods: ["GET"],
+        allowedHeaders: ["Content-Type", "X-FLIPPER-SECRET"]
+    })
+);
 
 // 🧠 Parse JSON request bodies
 app.use(express.json());
