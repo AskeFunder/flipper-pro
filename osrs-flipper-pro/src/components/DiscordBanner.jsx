@@ -2,11 +2,6 @@ import React from "react";
 import "../styles/browse.css";
 
 export default function DiscordBanner() {
-  // Only show in development environment
-  if (process.env.NODE_ENV !== "development") {
-    return null;
-  }
-
   const discordUrl = "https://discord.gg/3EXxDvQg";
 
   const discordIconSvg = (
