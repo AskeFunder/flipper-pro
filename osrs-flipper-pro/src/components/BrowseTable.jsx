@@ -5,6 +5,7 @@ import {
     formatColoredNumber,
     formatRoi,
     timeAgo,
+    nameToSlug,
 } from "../utils/formatting";
 
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
@@ -100,15 +101,51 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                 {items.map((item) => {
                     const icon = item.icon || `${item.name}.png`;
                     const safe = encodeURIComponent(icon.replace(/ /g, "_"));
+                    const slug = nameToSlug(item.name);
+                    const itemUrl = `/item/${item.id}-${encodeURIComponent(slug)}`;
+                    
+                    const handleRowClick = (e) => {
+                        // Don't navigate if clicking on a link (let browser handle it)
+                        if (e.target.tagName === "A" || e.target.closest("a")) {
+                            return;
+                        }
+                        // For normal clicks on the row, do SPA navigation
+                        if (onItemClick) {
+                            onItemClick(item.id, item.name);
+                        }
+                    };
+                    
+                    const handleLinkClick = (e) => {
+                        // If it's a normal click (not Ctrl/Cmd/Middle), do SPA navigation
+                        if (!e.ctrlKey && !e.metaKey && e.button === 0) {
+                            e.preventDefault();
+                            if (onItemClick) {
+                                onItemClick(item.id, item.name);
+                            }
+                        }
+                        // Otherwise, let browser handle it (Ctrl/Cmd/Middle-click for new tab)
+                    };
+                    
                     return (
                             <tr 
                                 key={item.id} 
                                 style={rowStyle}
-                                onClick={() => onItemClick && onItemClick(item.id, item.name)}
+                                onClick={handleRowClick}
                                 className="browse-table-row"
                             >
                             <td style={tdStyle}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                <a
+                                    href={itemUrl}
+                                    onClick={handleLinkClick}
+                                    className="browse-item-link"
+                                    style={{
+                                        color: "inherit",
+                                        textDecoration: "none",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 12,
+                                    }}
+                                >
                                     <img
                                         src={`${baseIconURL}/${safe}/32px-${safe}`}
                                         alt={item.name}
@@ -118,7 +155,7 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                                         onError={(e) => (e.currentTarget.style.display = "none")}
                                     />
                                     <span>{item.name}</span>
-                                </div>
+                                </a>
                             </td>
                             {visibleColumns.map((col) => {
                                 const value = item[col.id];

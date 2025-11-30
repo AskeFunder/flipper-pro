@@ -31,7 +31,6 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const [page, setPage] = useState("browse");
-  const [browseSearchQuery, setBrowseSearchQuery] = useState("");
   const [isSearchFromSearchBar, setIsSearchFromSearchBar] = useState(false);
   
   // Extract item ID/name from URL path
@@ -52,12 +51,6 @@ function App() {
     }
   }, [location.pathname, selectedItemName]);
 
-  // Clear search query when navigating away from browse page
-  useEffect(() => {
-    if (page !== "browse" || selectedItemName) {
-      setBrowseSearchQuery("");
-    }
-  }, [page, selectedItemName]);
   
   // Handler for item click - navigate to item detail page using item ID + name slug
   // Format: /item/4151-abyssal-whip (hybrid approach for reliability)
@@ -107,9 +100,11 @@ function App() {
                 if (item.id === "browse") {
                   // When clicking Browse Items, clear search-from-searchbar flag to restore filters
                   setIsSearchFromSearchBar(false);
-                  setBrowseSearchQuery(""); // Clear search query when navigating to browse
+                  // Navigate to browse without search params
+                  navigate("/browse");
+                } else {
+                  navigate(`/${item.id}`);
                 }
-                navigate(`/${item.id === "browse" ? "" : item.id}`);
               }}
               disableRipple
               disableTouchRipple
@@ -164,12 +159,9 @@ function App() {
             <SearchBar
               onItemClick={handleItemClick}
               onSearch={(query) => {
-                setBrowseSearchQuery(query);
                 setIsSearchFromSearchBar(true); // Mark that search came from searchbar (filterless)
-                // Navigate to browse page if not already there
-                if (page !== "browse" || selectedItemName) {
-                  navigate("/browse");
-                }
+                // Navigate to browse page with search param in URL
+                navigate(`/browse?search=${encodeURIComponent(query)}&sortBy=margin&order=desc&page=1`);
               }}
             />
           </Box>
@@ -192,8 +184,6 @@ function App() {
             <Route path="/browse" element={
               <BrowseItemsPage 
                 onItemClick={handleItemClick}
-                searchQuery={browseSearchQuery}
-                onSearchQueryChange={setBrowseSearchQuery}
                 isSearchFromSearchBar={isSearchFromSearchBar}
                 onSearchFromSearchBarChange={setIsSearchFromSearchBar}
               />
@@ -201,8 +191,6 @@ function App() {
             <Route path="/" element={
               <BrowseItemsPage 
                 onItemClick={handleItemClick}
-                searchQuery={browseSearchQuery}
-                onSearchQueryChange={setBrowseSearchQuery}
                 isSearchFromSearchBar={isSearchFromSearchBar}
                 onSearchFromSearchBarChange={setIsSearchFromSearchBar}
               />

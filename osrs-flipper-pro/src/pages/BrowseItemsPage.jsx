@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import "../styles/shimmer.css";
 import "../styles/browse.css";
 import {
@@ -19,10 +20,16 @@ const API_URL = `/api/items/browse`;
 const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
 const COLUMN_SETTINGS_STORAGE_KEY = "osrs-flipper-column-settings";
 
-export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearchQueryChange, isSearchFromSearchBar = false, onSearchFromSearchBarChange }) {
+export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = false, onSearchFromSearchBarChange }) {
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    // Read state from URL params (source of truth)
+    const sortBy = searchParams.get("sortBy") || "margin";
+    const order = searchParams.get("order") || "desc";
+    const currentPage = Number(searchParams.get("page") || 1);
+    const searchQuery = searchParams.get("search") || "";
+    
     const [items, setItems] = useState([]);
-    const [sortBy, setSortBy] = useState("margin");
-    const [order, setOrder] = useState("desc");
     const [loading, setLoading] = useState(false);
     
     // Load column settings from localStorage on mount
@@ -60,7 +67,6 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
         return {};
     });
     
-    const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalRows, setTotalRows] = useState(0);
 
@@ -113,7 +119,7 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
             });
 
         return () => controller.abort();
-    }, [searchQuery, sortBy, order, filters, columnSettings, currentPage, isSearchFromSearchBar]);
+    }, [searchQuery, sortBy, order, filters, currentPage, isSearchFromSearchBar]);
 
     // Save column settings to localStorage whenever they change
     useEffect(() => {
@@ -166,8 +172,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
 
             // Reset sort if we were sorting by the hidden column
             if (sortBy === id) {
-                setSortBy("margin");
-                setOrder("desc");
+                setSearchParams({
+                    sortBy: "margin",
+                    order: "desc",
+                    page: "1",
+                    ...(searchQuery ? { search: searchQuery } : {})
+                });
             }
         }
     };
@@ -205,14 +215,13 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
             onSearchFromSearchBarChange(false);
         }
         // Reset to page 1 when filters change
-        setCurrentPage(1);
+        setSearchParams({
+            sortBy,
+            order,
+            page: "1",
+            ...(searchQuery ? { search: searchQuery } : {})
+        });
     };
-
-    // Reset to page 1 when search or sort changes
-    // Note: Filters are preserved via localStorage and are NOT cleared when searchQuery changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery, sortBy, order]);
 
     const visible = columnSettings.filter((c) => c.visible);
 
@@ -287,9 +296,13 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                     placeholder="Search items by name..."
                     value={searchQuery}
                     onChange={(e) => {
-                        if (onSearchQueryChange) {
-                            onSearchQueryChange(e.target.value);
-                        }
+                        const newSearch = e.target.value;
+                        setSearchParams({
+                            sortBy,
+                            order,
+                            page: "1",
+                            ...(newSearch ? { search: newSearch } : {})
+                        });
                         // When user types in browse search, it's not from searchbar anymore
                         if (isSearchFromSearchBar && onSearchFromSearchBarChange) {
                             onSearchFromSearchBarChange(false);
@@ -300,9 +313,11 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                 {searchQuery && (
                     <button
                         onClick={() => {
-                            if (onSearchQueryChange) {
-                                onSearchQueryChange("");
-                            }
+                            setSearchParams({
+                                sortBy,
+                                order,
+                                page: "1"
+                            });
                             // Clear search-from-searchbar flag when clearing search
                             if (onSearchFromSearchBarChange) {
                                 onSearchFromSearchBarChange(false);
@@ -323,10 +338,13 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                 sortBy={sortBy}
                 order={order}
                 onSort={(col) => {
-                    setOrder((prev) =>
-                        sortBy === col ? (prev === "asc" ? "desc" : "asc") : "desc"
-                    );
-                    setSortBy(col);
+                    const newOrder = sortBy === col && order === "desc" ? "asc" : "desc";
+                    setSearchParams({
+                        sortBy: col,
+                        order: newOrder,
+                        page: "1",
+                        ...(searchQuery ? { search: searchQuery } : {})
+                    });
                 }}
                 onItemClick={onItemClick}
             />
@@ -335,7 +353,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
             {totalPages > 1 && (
                 <div style={paginationStyle}>
                     <button
-                        onClick={() => setCurrentPage(1)}
+                        onClick={() => setSearchParams({
+                            sortBy,
+                            order,
+                            page: "1",
+                            ...(searchQuery ? { search: searchQuery } : {})
+                        })}
                         disabled={currentPage === 1}
                         style={currentPage === 1 ? disabledButtonStyle : paginationButtonStyle}
                         className="pagination-button"
@@ -343,7 +366,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                         « First
                     </button>
                     <button
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        onClick={() => setSearchParams({
+                            sortBy,
+                            order,
+                            page: String(Math.max(1, currentPage - 1)),
+                            ...(searchQuery ? { search: searchQuery } : {})
+                        })}
                         disabled={currentPage === 1}
                         style={currentPage === 1 ? disabledButtonStyle : paginationButtonStyle}
                         className="pagination-button"
@@ -374,7 +402,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                             return (
                                 <button
                                     key={pageNum}
-                                    onClick={() => setCurrentPage(pageNum)}
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: String(pageNum),
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
                                     style={isActive ? pageNumberActiveStyle : pageNumberButtonStyle}
                                     className="pagination-page-button"
                                 >
@@ -385,7 +418,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                     </div>
 
                     <button
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        onClick={() => setSearchParams({
+                            sortBy,
+                            order,
+                            page: String(Math.min(totalPages, currentPage + 1)),
+                            ...(searchQuery ? { search: searchQuery } : {})
+                        })}
                         disabled={currentPage === totalPages}
                         style={currentPage === totalPages ? disabledButtonStyle : paginationButtonStyle}
                         className="pagination-button"
@@ -393,7 +431,12 @@ export default function BrowseItemsPage({ onItemClick, searchQuery = "", onSearc
                         Next ›
                     </button>
                     <button
-                        onClick={() => setCurrentPage(totalPages)}
+                        onClick={() => setSearchParams({
+                            sortBy,
+                            order,
+                            page: String(totalPages),
+                            ...(searchQuery ? { search: searchQuery } : {})
+                        })}
                         disabled={currentPage === totalPages}
                         style={currentPage === totalPages ? disabledButtonStyle : paginationButtonStyle}
                         className="pagination-button"
