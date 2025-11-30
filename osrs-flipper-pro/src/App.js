@@ -10,7 +10,6 @@ import {
   Typography,
   Box
 } from "@mui/material";
-import DashboardIcon from "@mui/icons-material/ShowChart";
 import SearchIcon from "@mui/icons-material/Search";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
@@ -60,7 +59,6 @@ function App() {
   };
 
   const navItems = [
-    { id: "dashboard", label: "Oathplate Dashboard", icon: <DashboardIcon /> },
     { id: "browse", label: "Browse Items", icon: <SearchIcon /> },
     { id: "methods", label: "Method Calculators", icon: <AttachMoneyIcon /> },
     { id: "live", label: "Day Trading Mode", icon: <FlashOnIcon /> },
