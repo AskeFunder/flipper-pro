@@ -13,6 +13,7 @@ import {
 import BrowseTable from "../components/BrowseTable";
 import ColumnPicker from "../components/ColumnPicker";
 import FilterBuilder from "../components/FilterBuilder";
+import DiscordBanner from "../components/DiscordBanner";
 import { allColumns } from "../constants/column";
 import { apiFetchJson } from "../utils/api";
 
@@ -227,6 +228,8 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
 
     return (
         <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif", width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box" }}>
+            <DiscordBanner />
+
             <h2>Browse Items</h2>
 
             <div style={actionButtonsStyle}>
