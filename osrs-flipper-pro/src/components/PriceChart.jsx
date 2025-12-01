@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Line } from "react-chartjs-2";
+import { useMobile } from "../hooks/useMobile";
 
 /**
  * Memoized Price Chart Component
@@ -9,6 +10,10 @@ import { Line } from "react-chartjs-2";
  * - Exact x-axis bounds with no padding
  */
 const PriceChart = React.memo(({ priceData, timeRange, height = 300 }) => {
+    const isMobile = useMobile();
+    const chartHeight = isMobile && typeof window !== 'undefined' 
+        ? Math.min(window.innerHeight * 0.45, 400) 
+        : height;
     const timeOptions = [
         { label: '4H', ms: 4 * 3600e3, granularity: '4h' },
         { label: '12H', ms: 12 * 3600e3, granularity: '5m' },
@@ -582,14 +587,14 @@ const PriceChart = React.memo(({ priceData, timeRange, height = 300 }) => {
     
     if (!hasValidData) {
         return (
-            <div style={{ height: `${height}px`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ height: `${chartHeight}px`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <p style={{ color: "#9aa4b2", fontSize: "14px", margin: 0 }}>No chart data available</p>
             </div>
         );
     }
     
     return (
-        <div style={{ height: `${height}px`, position: "relative" }}>
+        <div style={{ height: `${chartHeight}px`, position: "relative" }}>
             <Line data={chartData} options={chartOptions} />
         </div>
     );

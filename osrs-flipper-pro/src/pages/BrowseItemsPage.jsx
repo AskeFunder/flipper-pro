@@ -15,11 +15,16 @@ import ColumnPicker from "../components/ColumnPicker";
 import FilterBuilder from "../components/FilterBuilder";
 import TableModeSelector from "../components/TableModeSelector";
 import SidePanel from "../components/SidePanel";
+import MobileItemCard from "../components/MobileItemCard";
+import MobileDiscordBanner from "../components/mobile/MobileDiscordBanner";
 import { TABLE_MODES } from "../constants/tableModes";
 import { allColumns } from "../constants/column";
 import { apiFetch, apiFetchJson } from "../utils/api";
 import { useTableMode } from "../hooks/useTableMode";
+import { useMobile } from "../hooks/useMobile";
 import { isColumnAllowedInMode, isSortValidForMode, getDefaultSortForMode } from "../constants/tableModes";
+import ViewColumnIcon from "@mui/icons-material/ViewColumn";
+import FilterListIcon from "@mui/icons-material/FilterList";
 
 const API_URL = `/api/items/browse`;
 const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
@@ -27,6 +32,7 @@ const COLUMN_SETTINGS_STORAGE_KEY = "osrs-flipper-column-settings";
 
 export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = false, onSearchFromSearchBarChange }) {
     const [searchParams, setSearchParams] = useSearchParams();
+    const isMobile = useMobile();
     
     // Table mode management
     const { mode: tableMode, setMode: setTableMode, isHorizontal, isSide, isRow } = useTableMode();
@@ -415,7 +421,7 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
 
     return (
         <div style={{ 
-            padding: "2rem 2rem 0.75rem 2rem", 
+            padding: isMobile ? "0" : "2rem 2rem 0.75rem 2rem", 
             fontFamily: "'Inter',sans-serif", 
             width: "100%", 
             maxWidth: "100%", 
@@ -426,9 +432,12 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
             display: "flex",
             flexDirection: "column"
         }}>
-            <div style={{ flexShrink: 0, marginBottom: "0.5rem" }}>
-                <h2 style={{ color: "#e6e9ef", margin: "0 0 0.5rem 0", fontSize: "20px" }}>Browse Items</h2>
-            </div>
+            {/* Desktop: Title at top */}
+            {!isMobile && (
+                <div style={{ flexShrink: 0, marginBottom: "0.5rem" }}>
+                    <h2 style={{ color: "#e6e9ef", margin: "0 0 0.5rem 0", fontSize: "20px" }}>Browse Items</h2>
+                </div>
+            )}
 
             {showColumnPicker && (
                 <ColumnPicker
@@ -452,90 +461,92 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
                 />
             )}
 
-            {/* Search Input, View Selector, and Action Buttons */}
-            <div style={searchContainerStyle}>
-                <div style={searchInputWrapperStyle}>
-                    <input
-                        type="text"
-                        placeholder="Search items by name..."
-                        value={searchQuery}
-                        onChange={(e) => {
-                            const newSearch = e.target.value;
-                            setSearchParams({
-                                sortBy,
-                                order,
-                                page: "1",
-                                ...(newSearch ? { search: newSearch } : {})
-                            });
-                            // When user types in browse search, it's not from searchbar anymore
-                            if (isSearchFromSearchBar && onSearchFromSearchBarChange) {
-                                onSearchFromSearchBarChange(false);
-                            }
-                        }}
-                        style={searchInputStyle}
-                    />
-                    {searchQuery && (
-                        <button
-                            onClick={() => {
+            {/* Desktop: Search Input, View Selector, and Action Buttons */}
+            {!isMobile && (
+                <div style={getSearchContainerStyle(isMobile)}>
+                    <div style={getSearchInputWrapperStyle(isMobile)}>
+                        <input
+                            type="text"
+                            placeholder="Search items by name..."
+                            value={searchQuery}
+                            onChange={(e) => {
+                                const newSearch = e.target.value;
                                 setSearchParams({
                                     sortBy,
                                     order,
-                                    page: "1"
+                                    page: "1",
+                                    ...(newSearch ? { search: newSearch } : {})
                                 });
-                                // Clear search-from-searchbar flag when clearing search
-                                if (onSearchFromSearchBarChange) {
+                                // When user types in browse search, it's not from searchbar anymore
+                                if (isSearchFromSearchBar && onSearchFromSearchBarChange) {
                                     onSearchFromSearchBarChange(false);
                                 }
                             }}
-                            style={clearSearchButtonStyle}
-                            title="Clear search"
-                        >
-                            ×
-                        </button>
-                    )}
-                </div>
-                <div style={rightActionsStyle}>
-                    <button 
-                        onClick={() => {
-                            if (showColumnPicker) {
-                                // If already open, close it
-                                setShowColumnPicker(false);
-                            } else {
-                                // Close filter builder if open, then open column picker
-                                if (showFilterBuilder) {
-                                    setShowFilterBuilder(false);
-                                }
-                                setShowColumnPicker(true);
-                            }
-                        }} 
-                        style={actionButtonStyle}
-                        className="action-button"
-                    >
-                        Add Columns
-                    </button>
-                    <button 
-                        onClick={() => {
-                            if (showFilterBuilder) {
-                                // If already open, close it
-                                setShowFilterBuilder(false);
-                            } else {
-                                // Close column picker if open, then open filter builder
+                            style={searchInputStyle}
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => {
+                                    setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: "1"
+                                    });
+                                    // Clear search-from-searchbar flag when clearing search
+                                    if (onSearchFromSearchBarChange) {
+                                        onSearchFromSearchBarChange(false);
+                                    }
+                                }}
+                                style={clearSearchButtonStyle}
+                                title="Clear search"
+                            >
+                                ×
+                            </button>
+                        )}
+                    </div>
+                    <div style={getRightActionsStyle(isMobile)}>
+                        <button 
+                            onClick={() => {
                                 if (showColumnPicker) {
+                                    // If already open, close it
                                     setShowColumnPicker(false);
+                                } else {
+                                    // Close filter builder if open, then open column picker
+                                    if (showFilterBuilder) {
+                                        setShowFilterBuilder(false);
+                                    }
+                                    setShowColumnPicker(true);
                                 }
-                                setShowFilterBuilder(true);
-                            }
-                        }} 
-                        style={actionButtonStyle}
-                        className="action-button"
-                    >
-                        Add Filters
-                    </button>
-                    <div style={viewSelectorWrapperStyle}>
-                        <TableModeSelector mode={tableMode} onModeChange={setTableMode} />
+                            }} 
+                            style={getActionButtonStyle(isMobile)}
+                            className="action-button"
+                        >
+                            Add Columns
+                        </button>
+                        <button 
+                            onClick={() => {
+                                if (showFilterBuilder) {
+                                    // If already open, close it
+                                    setShowFilterBuilder(false);
+                                } else {
+                                    // Close column picker if open, then open filter builder
+                                    if (showColumnPicker) {
+                                        setShowColumnPicker(false);
+                                    }
+                                    setShowFilterBuilder(true);
+                                }
+                            }} 
+                            style={getActionButtonStyle(isMobile)}
+                            className="action-button"
+                        >
+                            Add Filters
+                        </button>
+                        <div style={viewSelectorWrapperStyle}>
+                            <TableModeSelector mode={tableMode} onModeChange={setTableMode} />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Main content area with flex layout for side panel */}
             <div style={{ 
@@ -566,34 +577,135 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
                         <div style={{ 
                             flex: 1,
                             minHeight: 0,
-                            overflow: "hidden",
+                            overflow: isMobile ? "hidden" : "hidden",
                             display: "flex",
                             flexDirection: "column"
                         }}>
-                            <BrowseTable
-                                items={items}
-                                visibleColumns={visible}
-                                loading={loading}
-                                error={error}
-                                sortBy={sortBy}
-                                order={order}
-                                tableMode={tableMode}
-                                onSort={(col) => {
-                                    const newOrder = sortBy === col && order === "desc" ? "asc" : "desc";
-                                    setSearchParams({
-                                        sortBy: col,
-                                        order: newOrder,
-                                        page: "1",
-                                        ...(searchQuery ? { search: searchQuery } : {})
-                                    });
-                                }}
-                                onRowClick={handleRowClick}
-                                expandedRowIds={expandedRowIds}
-                                isRowExpanded={isRowExpanded}
-                                isRowFocused={isRowFocused}
-                                isRowSelected={isRowSelected}
-                                onKeyDown={handleKeyDown}
-                            />
+                            {isMobile ? (
+                                // Mobile: Card list - resizes between Discord banner and pagination
+                                <div style={{ 
+                                    padding: "0", 
+                                    display: "flex", 
+                                    flexDirection: "column", 
+                                    width: "100%",
+                                    height: totalPages > 1 
+                                        ? "calc(100vh - 50px - 40px - 44px - 48px)" // search (50px) + Discord (40px) + pagination (44px) + bottom nav (48px)
+                                        : "calc(100vh - 50px - 40px - 48px)", // search (50px) + Discord (40px) + bottom nav (48px)
+                                    overflowY: "auto",
+                                    boxSizing: "border-box"
+                                }}>
+                                    {/* Mobile Header - Inside scrollable content */}
+                                    <div style={{ 
+                                        flexShrink: 0,
+                                        backgroundColor: "#0f1115",
+                                        borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "0"
+                                    }}>
+                                        {/* Action Chips (inline toolbar - same height as Discord) */}
+                                        <div style={{ display: "flex", gap: "0", borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}>
+                                            <button
+                                                onClick={() => {
+                                                    if (showColumnPicker) {
+                                                        setShowColumnPicker(false);
+                                                    } else {
+                                                        if (showFilterBuilder) {
+                                                            setShowFilterBuilder(false);
+                                                        }
+                                                        setShowColumnPicker(true);
+                                                    }
+                                                }}
+                                                style={actionChipStyle}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.color = "#e6e9ef";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.color = "#9aa4b2";
+                                                }}
+                                            >
+                                                <ViewColumnIcon sx={{ fontSize: "16px" }} />
+                                                <span>Columns</span>
+                                            </button>
+                                            <div style={{ width: "1px", backgroundColor: "rgba(255, 255, 255, 0.06)" }} />
+                                            <button
+                                                onClick={() => {
+                                                    if (showFilterBuilder) {
+                                                        setShowFilterBuilder(false);
+                                                    } else {
+                                                        if (showColumnPicker) {
+                                                            setShowColumnPicker(false);
+                                                        }
+                                                        setShowFilterBuilder(true);
+                                                    }
+                                                }}
+                                                style={actionChipStyle}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.color = "#e6e9ef";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.color = "#9aa4b2";
+                                                }}
+                                            >
+                                                <FilterListIcon sx={{ fontSize: "16px" }} />
+                                                <span>Filters</span>
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Section Title */}
+                                        <h2 style={{ color: "#e6e9ef", margin: "8px 12px 4px 12px", fontSize: "16px", fontWeight: 600 }}>
+                                            {searchQuery ? "Search Results" : filters.length > 0 ? "Filtered Results" : "Browse Items"}
+                                        </h2>
+                                    </div>
+                                    
+                                    {loading ? (
+                                        <div style={{ textAlign: "center", padding: "40px", color: "#9aa4b2" }}>
+                                            Loading...
+                                        </div>
+                                    ) : error ? (
+                                        <div style={{ textAlign: "center", padding: "40px", color: "#ff5c5c" }}>
+                                            {error.message}
+                                        </div>
+                                    ) : items.length === 0 ? (
+                                        <div style={{ textAlign: "center", padding: "40px", color: "#9aa4b2" }}>
+                                            No items found
+                                        </div>
+                                    ) : (
+                                        items.map((item) => (
+                                            <MobileItemCard
+                                                key={item.id}
+                                                item={item}
+                                                onClick={() => handleRowClick(item.id, item.name)}
+                                            />
+                                        ))
+                                    )}
+                                </div>
+                            ) : (
+                                <BrowseTable
+                                    items={items}
+                                    visibleColumns={visible}
+                                    loading={loading}
+                                    error={error}
+                                    sortBy={sortBy}
+                                    order={order}
+                                    tableMode={tableMode}
+                                    onSort={(col) => {
+                                        const newOrder = sortBy === col && order === "desc" ? "asc" : "desc";
+                                        setSearchParams({
+                                            sortBy: col,
+                                            order: newOrder,
+                                            page: "1",
+                                            ...(searchQuery ? { search: searchQuery } : {})
+                                        });
+                                    }}
+                                    onRowClick={handleRowClick}
+                                    expandedRowIds={expandedRowIds}
+                                    isRowExpanded={isRowExpanded}
+                                    isRowFocused={isRowFocused}
+                                    isRowSelected={isRowSelected}
+                                    onKeyDown={handleKeyDown}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -605,101 +717,138 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
                 
                 {/* Pagination - positioned below table, not affected by side panel */}
                 {totalPages > 1 && (
-                    <div style={{ flexShrink: 0 }}>
-                        <div style={paginationStyle}>
-                            <button
-                                onClick={() => setSearchParams({
-                                    sortBy,
-                                    order,
-                                    page: "1",
-                                    ...(searchQuery ? { search: searchQuery } : {})
-                                })}
-                                disabled={currentPage === 1}
-                                style={currentPage === 1 ? disabledButtonStyle : paginationButtonStyle}
-                                className="pagination-button"
-                            >
-                                « First
-                            </button>
-                            <button
-                                onClick={() => setSearchParams({
-                                    sortBy,
-                                    order,
-                                    page: String(Math.max(1, currentPage - 1)),
-                                    ...(searchQuery ? { search: searchQuery } : {})
-                                })}
-                                disabled={currentPage === 1}
-                                style={currentPage === 1 ? disabledButtonStyle : paginationButtonStyle}
-                                className="pagination-button"
-                            >
-                                ‹ Previous
-                            </button>
-                            
-                            <div style={paginationInfoStyle}>
-                                Page {currentPage} of {totalPages}
-                                {totalRows > 0 && <span style={{ color: "#9ca3af" }}> ({totalRows} items)</span>}
+                    <>
+                        {isMobile ? (
+                            /* Mobile: Compact single-row pagination - fixed above bottom nav (outside flex layout) */
+                            <div style={mobilePaginationStyle}>
+                                <button
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: String(Math.max(1, currentPage - 1)),
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
+                                    disabled={currentPage === 1}
+                                    style={currentPage === 1 ? mobilePaginationDisabledStyle : mobilePaginationButtonStyle}
+                                >
+                                    ‹ Prev
+                                </button>
+                                <div style={mobilePaginationInfoStyle}>
+                                    Page {currentPage} / {totalPages}
+                                </div>
+                                <button
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: String(Math.min(totalPages, currentPage + 1)),
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
+                                    disabled={currentPage === totalPages}
+                                    style={currentPage === totalPages ? mobilePaginationDisabledStyle : mobilePaginationButtonStyle}
+                                >
+                                    Next ›
+                                </button>
                             </div>
+                        ) : null}
+                        {!isMobile && (
+                            /* Desktop: Full pagination */
+                            <div style={{ flexShrink: 0 }}>
+                                <div style={paginationStyle}>
+                                <button
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: "1",
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
+                                    disabled={currentPage === 1}
+                                    style={currentPage === 1 ? disabledButtonStyle : paginationButtonStyle}
+                                    className="pagination-button"
+                                >
+                                    « First
+                                </button>
+                                <button
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: String(Math.max(1, currentPage - 1)),
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
+                                    disabled={currentPage === 1}
+                                    style={currentPage === 1 ? disabledButtonStyle : paginationButtonStyle}
+                                    className="pagination-button"
+                                >
+                                    ‹ Previous
+                                </button>
+                                
+                                <div style={paginationInfoStyle}>
+                                    Page {currentPage} of {totalPages}
+                                    {totalRows > 0 && <span style={{ color: "#9ca3af" }}> ({totalRows} items)</span>}
+                                </div>
 
-                            {/* Page number buttons */}
-                            <div style={pageNumbersStyle}>
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    let pageNum;
-                                    if (totalPages <= 5) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage <= 3) {
-                                        pageNum = i + 1;
-                                    } else if (currentPage >= totalPages - 2) {
-                                        pageNum = totalPages - 4 + i;
-                                    } else {
-                                        pageNum = currentPage - 2 + i;
-                                    }
-                                    
-                                    const isActive = currentPage === pageNum;
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            onClick={() => setSearchParams({
-                                                sortBy,
-                                                order,
-                                                page: String(pageNum),
-                                                ...(searchQuery ? { search: searchQuery } : {})
-                                            })}
-                                            style={isActive ? pageNumberActiveStyle : pageNumberButtonStyle}
-                                            className="pagination-page-button"
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
+                                {/* Page number buttons */}
+                                <div style={pageNumbersStyle}>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        
+                                        const isActive = currentPage === pageNum;
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                onClick={() => setSearchParams({
+                                                    sortBy,
+                                                    order,
+                                                    page: String(pageNum),
+                                                    ...(searchQuery ? { search: searchQuery } : {})
+                                                })}
+                                                style={isActive ? pageNumberActiveStyle : pageNumberButtonStyle}
+                                                className="pagination-page-button"
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <button
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: String(Math.min(totalPages, currentPage + 1)),
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
+                                    disabled={currentPage === totalPages}
+                                    style={currentPage === totalPages ? disabledButtonStyle : paginationButtonStyle}
+                                    className="pagination-button"
+                                >
+                                    Next ›
+                                </button>
+                                <button
+                                    onClick={() => setSearchParams({
+                                        sortBy,
+                                        order,
+                                        page: String(totalPages),
+                                        ...(searchQuery ? { search: searchQuery } : {})
+                                    })}
+                                    disabled={currentPage === totalPages}
+                                    style={currentPage === totalPages ? disabledButtonStyle : paginationButtonStyle}
+                                    className="pagination-button"
+                                >
+                                    Last »
+                                </button>
                             </div>
-
-                            <button
-                                onClick={() => setSearchParams({
-                                    sortBy,
-                                    order,
-                                    page: String(Math.min(totalPages, currentPage + 1)),
-                                    ...(searchQuery ? { search: searchQuery } : {})
-                                })}
-                                disabled={currentPage === totalPages}
-                                style={currentPage === totalPages ? disabledButtonStyle : paginationButtonStyle}
-                                className="pagination-button"
-                            >
-                                Next ›
-                            </button>
-                            <button
-                                onClick={() => setSearchParams({
-                                    sortBy,
-                                    order,
-                                    page: String(totalPages),
-                                    ...(searchQuery ? { search: searchQuery } : {})
-                                })}
-                                disabled={currentPage === totalPages}
-                                style={currentPage === totalPages ? disabledButtonStyle : paginationButtonStyle}
-                                className="pagination-button"
-                            >
-                                Last »
-                            </button>
-                        </div>
-                    </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
@@ -778,6 +927,54 @@ const pageNumberActiveStyle = {
     fontWeight: "bold",
 };
 
+// Mobile pagination styles (compact, single row)
+const mobilePaginationStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    padding: "8px 12px",
+    backgroundColor: "#151a22",
+    borderRadius: "0",
+    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+    height: "44px",
+    maxHeight: "44px",
+    boxSizing: "border-box",
+    position: "fixed",
+    bottom: "48px", // Snap directly above bottom nav bar (48px height)
+    left: 0,
+    right: 0,
+    zIndex: 999, // Below search bar (1100) but above content
+};
+
+const mobilePaginationButtonStyle = {
+    padding: "6px 12px",
+    fontSize: "13px",
+    fontWeight: 500,
+    borderRadius: "4px",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    backgroundColor: "#202737",
+    color: "#e6e9ef",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    minWidth: "60px",
+};
+
+const mobilePaginationDisabledStyle = {
+    ...mobilePaginationButtonStyle,
+    opacity: 0.4,
+    cursor: "not-allowed",
+    backgroundColor: "#181e27",
+};
+
+const mobilePaginationInfoStyle = {
+    fontSize: "12px",
+    color: "#9aa4b2",
+    fontWeight: 500,
+    textAlign: "center",
+    flex: 1,
+};
+
 const actionButtonsStyle = {
     display: "flex",
     gap: "12px",
@@ -785,34 +982,25 @@ const actionButtonsStyle = {
     flexWrap: "wrap",
 };
 
-const actionButtonStyle = {
-    padding: "8px 16px",
-    fontSize: "13px",
-    fontWeight: 500,
-    color: "#e6e9ef",
-    background: "#202737", /* Button base */
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    borderRadius: "6px",
-    cursor: "pointer",
-    transition: "all 0.2s",
-};
-
-const searchContainerStyle = {
+// Mobile-aware styles
+const getSearchContainerStyle = (isMobile) => ({
     position: "relative",
     marginBottom: "0.5rem",
     maxWidth: "100%",
     display: "flex",
-    gap: "10px",
-    alignItems: "center",
-    justifyContent: "space-between",
-};
+    flexDirection: isMobile ? "column" : "row",
+    gap: isMobile ? "12px" : "10px",
+    alignItems: isMobile ? "stretch" : "center",
+    justifyContent: isMobile ? "flex-start" : "space-between",
+});
 
-const searchInputWrapperStyle = {
+const getSearchInputWrapperStyle = (isMobile) => ({
     position: "relative",
     flex: 1,
     minWidth: 0,
-    maxWidth: "500px",
-};
+    maxWidth: isMobile ? "100%" : "500px",
+    width: isMobile ? "100%" : "auto",
+});
 
 const searchInputStyle = {
     width: "100%",
@@ -842,11 +1030,54 @@ const clearSearchButtonStyle = {
     transition: "color 0.2s",
 };
 
-const rightActionsStyle = {
+const getRightActionsStyle = (isMobile) => ({
     display: "flex",
-    gap: "10px",
-    alignItems: "center",
+    flexDirection: isMobile ? "column" : "row",
+    gap: isMobile ? "8px" : "10px",
+    alignItems: isMobile ? "stretch" : "center",
     flexShrink: 0,
+    width: isMobile ? "100%" : "auto",
+});
+
+const getActionButtonStyle = (isMobile) => ({
+    padding: "8px 16px",
+    fontSize: "13px",
+    fontWeight: 500,
+    color: "#e6e9ef",
+    background: "#202737", /* Button base */
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    borderRadius: "6px",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    width: isMobile ? "100%" : "auto",
+    minHeight: isMobile ? "44px" : "auto", // Touch target size
+});
+
+// Mobile Action Chip Style (compact inline buttons - same height as Discord banner)
+const actionChipStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "8px 12px",
+    fontSize: "12px",
+    fontWeight: 400,
+    color: "#9aa4b2",
+    background: "transparent",
+    border: "none",
+    borderRadius: "0",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    flex: 1,
+    height: "40px",
+    maxHeight: "40px",
+    justifyContent: "center",
+    fontFamily: "'Inter', sans-serif",
+};
+
+// Add hover effect for action chips
+const actionChipHoverStyle = {
+    ...actionChipStyle,
+    background: "#252d3a",
 };
 
 const viewSelectorWrapperStyle = {

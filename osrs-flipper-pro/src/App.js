@@ -21,7 +21,11 @@ import BrowseItemsPage from "./pages/BrowseItemsPage";
 import ItemDetailPage from "./pages/ItemDetailPage";
 import ChangelogPage from "./pages/ChangelogPage";
 import SearchBar from "./components/SearchBar";
+import FilterBar from "./components/FilterBar";
 import DiscordBanner from "./components/DiscordBanner";
+import MobileDiscordBanner from "./components/mobile/MobileDiscordBanner";
+import MobileNavBar from "./components/mobile/MobileNavBar";
+import { useMobile } from "./hooks/useMobile";
 import { nameToSlug } from "./utils/formatting";
 
 
@@ -30,6 +34,7 @@ const drawerWidth = 220;
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useMobile();
   const [page, setPage] = useState("browse");
   const [isSearchFromSearchBar, setIsSearchFromSearchBar] = useState(false);
   
@@ -70,102 +75,104 @@ function App() {
 
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
-      {/* Sidebar */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: {
+      {/* DESKTOP ONLY: Sidebar */}
+      {!isMobile && (
+        <Drawer
+          variant="permanent"
+          sx={{
             width: drawerWidth,
-            boxSizing: "border-box",
-            backgroundColor: "#151a22", /* Table surface */
-            color: "#e6e9ef",
-            borderRight: "1px solid rgba(255, 255, 255, 0.06)",
-            background: "linear-gradient(180deg, #151a22 0%, #0f1115 100%)",
-          },
-        }}
-      >
-        <Toolbar sx={{ 
-          background: "linear-gradient(135deg, #5865F2 0%, #4752C4 100%)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-          minHeight: "64px !important",
-        }}>
-          <Typography 
-            variant="h6" 
-            noWrap 
-            component="div"
-            sx={{
-              fontWeight: 700,
-              fontSize: "20px",
-              letterSpacing: "-0.5px",
-              background: "linear-gradient(135deg, #ffffff 0%, #e6e9ef 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            FlipperPro
-          </Typography>
-        </Toolbar>
-        <List sx={{ padding: "8px" }}>
-          {navItems.map((item) => (
-            <ListItemButton
-              key={item.id}
-              selected={page === item.id && !selectedItemName}
-              onClick={() => {
-                if (item.id === "browse") {
-                  // When clicking Browse Items, clear search-from-searchbar flag to restore filters
-                  setIsSearchFromSearchBar(false);
-                  // Navigate to browse without search params
-                  navigate("/browse");
-                } else {
-                  navigate(`/${item.id}`);
-                }
-              }}
-              disableRipple
-              disableTouchRipple
+            flexShrink: 0,
+            [`& .MuiDrawer-paper`]: {
+              width: drawerWidth,
+              boxSizing: "border-box",
+              backgroundColor: "#151a22", /* Table surface */
+              color: "#e6e9ef",
+              borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+              background: "linear-gradient(180deg, #151a22 0%, #0f1115 100%)",
+            },
+          }}
+        >
+          <Toolbar sx={{ 
+            background: "linear-gradient(135deg, #5865F2 0%, #4752C4 100%)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            minHeight: "64px !important",
+          }}>
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div"
               sx={{
-                color: "#9aa4b2",
-                borderRadius: "8px",
-                marginBottom: "4px",
-                padding: "12px 16px",
-                transition: "all 0.2s",
-                "&.Mui-selected": {
-                  backgroundColor: "#202737",
-                  color: "#e6e9ef",
-                  fontWeight: 600,
-                  "& .MuiListItemIcon-root": {
-                    color: "#5865F2",
-                  },
-                },
-                "&:hover": {
-                  backgroundColor: "#181e27",
-                  color: "#e6e9ef",
-                  "& .MuiListItemIcon-root": {
-                    color: "#5865F2",
-                  },
-                },
+                fontWeight: 700,
+                fontSize: "20px",
+                letterSpacing: "-0.5px",
+                background: "linear-gradient(135deg, #ffffff 0%, #e6e9ef 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
-              <ListItemIcon sx={{ 
-                color: "inherit",
-                minWidth: "40px",
-                transition: "color 0.2s",
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText 
-                primary={item.label}
-                primaryTypographyProps={{
-                  fontSize: "14px",
-                  fontWeight: "inherit",
+              FlipperPro
+            </Typography>
+          </Toolbar>
+          <List sx={{ padding: "8px" }}>
+            {navItems.map((item) => (
+              <ListItemButton
+                key={item.id}
+                selected={page === item.id && !selectedItemName}
+                onClick={() => {
+                  if (item.id === "browse") {
+                    // When clicking Browse Items, clear search-from-searchbar flag to restore filters
+                    setIsSearchFromSearchBar(false);
+                    // Navigate to browse without search params
+                    navigate("/browse");
+                  } else {
+                    navigate(`/${item.id}`);
+                  }
                 }}
-              />
-            </ListItemButton>
-          ))}
-        </List>
-      </Drawer>
+                disableRipple
+                disableTouchRipple
+                sx={{
+                  color: "#9aa4b2",
+                  borderRadius: "8px",
+                  marginBottom: "4px",
+                  padding: "12px 16px",
+                  transition: "all 0.2s",
+                  "&.Mui-selected": {
+                    backgroundColor: "#202737",
+                    color: "#e6e9ef",
+                    fontWeight: 600,
+                    "& .MuiListItemIcon-root": {
+                      color: "#5865F2",
+                    },
+                  },
+                  "&:hover": {
+                    backgroundColor: "#181e27",
+                    color: "#e6e9ef",
+                    "& .MuiListItemIcon-root": {
+                      color: "#5865F2",
+                    },
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: "inherit",
+                  minWidth: "40px",
+                  transition: "color 0.2s",
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontSize: "14px",
+                    fontWeight: "inherit",
+                  }}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </Drawer>
+      )}
 
       {/* Main content */}
       <Box
@@ -181,33 +188,63 @@ function App() {
           overflowX: "hidden",
           width: "100%",
           maxWidth: "100%",
+          paddingBottom: 0, // No padding - pagination and bottom nav are fixed
         }}
       >
-        {/* Search Bar and Discord Badge - Floating in top right corner */}
+        {/* Search Bar and Discord Badge - Floating in top right corner (Desktop) / Floating header (Mobile) */}
         {(page === "browse" || selectedItemName) && (
           <Box
             sx={{
-              position: "absolute",
-              top: 0,
-              right: "16px",
-              zIndex: 1000,
-              p: 2,
+              position: isMobile ? "fixed" : "absolute",
+              top: isMobile ? 0 : 0,
+              right: isMobile ? 0 : "16px",
+              left: isMobile ? 0 : "auto",
+              zIndex: isMobile ? 1100 : 1000,
+              p: isMobile ? "0" : 2,
               display: "flex",
               alignItems: "center",
-              gap: "12px",
-              justifyContent: "flex-end",
+              gap: isMobile ? 0 : "12px",
+              justifyContent: isMobile ? "stretch" : "flex-end",
               pointerEvents: "auto",
+              width: isMobile ? "100%" : "auto",
+              flexDirection: isMobile ? "column" : "row",
+              backgroundColor: isMobile ? "#0f1115" : "transparent",
+              borderBottom: "none", // No border - Discord banner will have borderTop instead
             }}
           >
-            <DiscordBanner />
-            <SearchBar
-              onItemClick={handleItemClick}
-              onSearch={(query) => {
-                setIsSearchFromSearchBar(true); // Mark that search came from searchbar (filterless)
-                // Navigate to browse page with search param in URL
-                navigate(`/browse?search=${encodeURIComponent(query)}&sortBy=margin&order=desc&page=1`);
-              }}
-            />
+            {!isMobile && <DiscordBanner />}
+            <Box sx={{ width: isMobile ? "100%" : "auto", flex: isMobile ? 1 : "none", p: isMobile ? "8px" : 0 }}>
+              {isMobile ? (
+                <FilterBar />
+              ) : (
+                <SearchBar
+                  onItemClick={handleItemClick}
+                  onSearch={(query) => {
+                    setIsSearchFromSearchBar(true); // Mark that search came from searchbar (filterless)
+                    // Navigate to browse page with search param in URL
+                    navigate(`/browse?search=${encodeURIComponent(query)}&sortBy=margin&order=desc&page=1`);
+                  }}
+                />
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {/* Mobile: Fixed Discord Banner (below search bar) */}
+        {isMobile && (page === "browse" || selectedItemName) && (
+          <Box
+            sx={{
+              position: "fixed",
+              top: "50px", // Below sticky search bar container
+              left: 0,
+              right: 0,
+              zIndex: 1050, // Below search results (1200) but above content
+              backgroundColor: "#0f1115",
+              borderTop: "none", // No border - sits flush with search bar
+              borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            }}
+          >
+            <MobileDiscordBanner />
           </Box>
         )}
 
@@ -215,11 +252,14 @@ function App() {
         <Box
           sx={{
             flexGrow: 1,
-            p: 3,
+            p: isMobile ? 0 : 3,
             overflowY: "auto",
             overflowX: "hidden",
             width: "100%",
             maxWidth: "100%",
+            paddingBottom: isMobile ? 0 : "24px", // No padding on mobile - pagination and bottom nav are fixed
+            paddingTop: isMobile && (page === "browse" || selectedItemName) ? "90px" : 0, // Space for search bar (50px) + Discord banner (40px)
+            marginBottom: isMobile && (page === "browse" || selectedItemName) ? "48px" : 0, // Space for bottom nav (48px) - pagination is fixed above it
           }}
         >
           <Routes>
@@ -241,12 +281,16 @@ function App() {
             } />
             <Route path="/methods" element={<Typography>Method Calculators – coming soon.</Typography>} />
             <Route path="/live" element={<Typography>Day Trading Mode – coming soon.</Typography>} />
+            <Route path="/market" element={<Typography>Market – coming soon.</Typography>} />
             <Route path="/favorites" element={<Typography>Favorites – coming soon.</Typography>} />
             <Route path="/settings" element={<Typography>Settings – coming soon.</Typography>} />
             <Route path="/changelog" element={<ChangelogPage />} />
           </Routes>
         </Box>
       </Box>
+
+      {/* MOBILE ONLY: Bottom Navigation Bar */}
+      {isMobile && <MobileNavBar />}
     </Box>
   );
 }

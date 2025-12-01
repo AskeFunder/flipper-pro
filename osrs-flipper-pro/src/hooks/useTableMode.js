@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TABLE_MODES } from '../constants/tableModes';
+import { useMobile } from './useMobile';
 
 const TABLE_MODE_STORAGE_KEY = 'osrs-flipper-table-mode';
 
@@ -15,8 +16,14 @@ const TABLE_MODE_STORAGE_KEY = 'osrs-flipper-table-mode';
  * @returns {Function} isRestricted - Check if current mode is restricted (side/row)
  */
 export function useTableMode() {
+  const isMobile = useMobile();
+  
   // Initialize mode from localStorage or default to horizontal
+  // On mobile, always force SIDE mode
   const [mode, setModeState] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return TABLE_MODES.SIDE; // Force side mode on mobile
+    }
     try {
       const saved = localStorage.getItem(TABLE_MODE_STORAGE_KEY);
       if (saved && Object.values(TABLE_MODES).includes(saved)) {
@@ -27,6 +34,13 @@ export function useTableMode() {
     }
     return TABLE_MODES.HORIZONTAL; // Default to horizontal
   });
+  
+  // Force side mode on mobile
+  useEffect(() => {
+    if (isMobile && mode !== TABLE_MODES.SIDE) {
+      setModeState(TABLE_MODES.SIDE);
+    }
+  }, [isMobile, mode]);
 
   // Persist mode changes to localStorage
   useEffect(() => {

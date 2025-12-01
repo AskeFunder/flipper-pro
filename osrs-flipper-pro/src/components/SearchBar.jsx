@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import SearchIcon from "@mui/icons-material/Search";
 import { apiFetchJson } from "../utils/api";
+import { useMobile } from "../hooks/useMobile";
 
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
@@ -31,6 +32,7 @@ async function getAllItems() {
 }
 
 export default function SearchBar({ onItemClick, onSearch }) {
+    const isMobile = useMobile();
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
     const [isLoadingItems, setIsLoadingItems] = useState(true);
@@ -122,7 +124,7 @@ export default function SearchBar({ onItemClick, onSearch }) {
     };
 
     return (
-        <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+        <div style={{ position: "relative", display: "flex", alignItems: "center", width: isMobile ? "100%" : "auto" }}>
             <div
                 ref={dropdownRef}
                 style={{
@@ -130,6 +132,7 @@ export default function SearchBar({ onItemClick, onSearch }) {
                     zIndex: 1000,
                     display: "flex",
                     alignItems: "center",
+                    width: isMobile ? "100%" : "auto",
                 }}
             >
                 <SearchIcon 
@@ -153,10 +156,12 @@ export default function SearchBar({ onItemClick, onSearch }) {
                         borderRadius: "4px",
                         backgroundColor: "#151a22", /* Table surface */
                         color: "#e6e9ef",
-                        width: "300px",
+                        width: isMobile ? "100%" : "300px",
+                        maxWidth: isMobile ? "100%" : "300px",
                         fontSize: "14px",
                         outline: "none",
                         boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+                        boxSizing: "border-box",
                     }}
                 />
                 {query.trim() && !isLoadingItems && (
@@ -173,7 +178,7 @@ export default function SearchBar({ onItemClick, onSearch }) {
                             boxShadow: "0 4px 6px rgba(0,0,0,0.5)",
                             maxHeight: "300px",
                             overflowY: "auto",
-                            zIndex: 1001,
+                            zIndex: 1200, // Higher than Discord banner (1100) to show above it
                         }}
                     >
                         {results.length === 0 ? (

@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import {
     formatPriceFull,
     formatColoredNumber,
     formatRoi,
     timeAgo,
+    nameToSlug,
 } from "../utils/formatting";
 import { apiFetch } from "../utils/api";
+import { useMobile } from "../hooks/useMobile";
 import { useLivePrice } from "../hooks/useLivePrice";
 import { useLiveTrades } from "../hooks/useLiveTrades";
 import { useChartStream } from "../hooks/useChartStream";
@@ -36,6 +40,8 @@ const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
  * - Advanced metrics (lazy-loaded with 5-minute cache)
  */
 export default function SidePanel({ item, onClose }) {
+    const navigate = useNavigate();
+    const isMobile = useMobile();
     const [isMounted, setIsMounted] = useState(false);
     
     // Data states
@@ -168,12 +174,39 @@ export default function SidePanel({ item, onClose }) {
     
     return (
         <div 
-            style={panelStyle}
+            style={getPanelStyle(isMobile)}
             role="complementary"
             aria-label={`Side panel for ${item.name}`}
         >
-            <div style={headerStyle}>
+            <div style={getHeaderStyle(isMobile)}>
                 <div style={headerContentStyle}>
+                    {isMobile && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onClose) {
+                                    onClose();
+                                }
+                            }}
+                            style={backButtonStyle}
+                            aria-label="Back"
+                            title="Back to list"
+                            onMouseEnter={(e) => {
+                                Object.assign(e.currentTarget.style, {
+                                    background: "#202737",
+                                    color: "#e6e9ef",
+                                });
+                            }}
+                            onMouseLeave={(e) => {
+                                Object.assign(e.currentTarget.style, {
+                                    background: "none",
+                                    color: "#9aa4b2",
+                                });
+                            }}
+                        >
+                            <ArrowBackIcon sx={{ fontSize: "24px" }} />
+                        </button>
+                    )}
                     {canonicalData?.icon && (
                         <img
                             src={`${baseIconURL}/${safe}/32px-${safe}`}
@@ -198,17 +231,47 @@ export default function SidePanel({ item, onClose }) {
                         )}
                     </div>
                 </div>
-                <button 
-                    onClick={onClose} 
-                    style={closeButtonStyle}
-                    aria-label="Close side panel"
-                    title="Close side panel (Escape)"
-                >
-                    ×
-                </button>
+                <div style={headerActionsStyle}>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const slug = nameToSlug(item.name);
+                            navigate(`/item/${item.id}-${encodeURIComponent(slug)}`);
+                        }}
+                        style={openFullViewButtonStyle}
+                        onMouseEnter={(e) => {
+                            Object.assign(e.currentTarget.style, {
+                                background: "#202737",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                color: "#e6e9ef",
+                            });
+                        }}
+                        onMouseLeave={(e) => {
+                            Object.assign(e.currentTarget.style, {
+                                background: "#151a22",
+                                border: "1px solid rgba(255, 255, 255, 0.06)",
+                                color: "#9aa4b2",
+                            });
+                        }}
+                        aria-label="Open Full View"
+                        title="Open Full View"
+                    >
+                        ↗
+                    </button>
+                    {!isMobile && (
+                        <button 
+                            onClick={onClose} 
+                            style={closeButtonStyle}
+                            aria-label="Close side panel"
+                            title="Close side panel (Escape)"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
             </div>
             
-            <div style={contentStyle}>
+            <div style={contentStyle(isMobile)}>
                 {!isMounted ? (
                     <div style={loadingBoxStyle}>
                         <p style={loadingTextStyle}>Loading...</p>
@@ -218,13 +281,21 @@ export default function SidePanel({ item, onClose }) {
                         {/* Chart */}
                         <div style={sectionStyle}>
                             <h4 style={sectionTitleStyle}>Price Chart</h4>
-                            <div style={timeRangeButtonsStyle}>
+                            <div style={{
+                                ...timeRangeButtonsStyle,
+                                ...(isMobile ? {
+                                    overflowX: "auto",
+                                    WebkitOverflowScrolling: "touch",
+                                    scrollbarWidth: "thin",
+                                } : {})
+                            }}>
                                 {timeOptions.map(({ label }) => (
                                     <button
                                         key={label}
                                         onClick={() => setTimeRange(label)}
                                         style={{
                                             ...timeRangeButtonStyle,
+                                            ...(isMobile ? { flexShrink: 0 } : {}),
                                             background: label === timeRange ? '#202737' : '#151a22',
                                             color: label === timeRange ? '#e6e9ef' : '#9aa4b2',
                                             border: label === timeRange ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.06)',
@@ -239,7 +310,7 @@ export default function SidePanel({ item, onClose }) {
                                     <p style={loadingTextStyle}>Loading chart...</p>
                                 </div>
                             ) : (
-                                <PriceChart priceData={chartData} timeRange={timeRange} height={300} />
+                                <PriceChart priceData={chartData} timeRange={timeRange} height={isMobile && typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.45, 400) : 300} />
                             )}
                         </div>
                         
@@ -273,7 +344,7 @@ export default function SidePanel({ item, onClose }) {
                             {tradesLoading ? (
                                 <p style={loadingTextStyle}>Loading trades...</p>
                             ) : (
-                                <TradeList trades={trades} maxHeight={200} maxItems={10} />
+                                <TradeList trades={trades} maxHeight={isMobile ? 150 : 200} maxItems={isMobile ? 7 : 10} />
                             )}
                         </div>
                         
@@ -323,28 +394,47 @@ function PriceField({ label, value }) {
     );
 }
 
-const panelStyle = {
-    width: "400px",
-    flexShrink: 0,
+// Panel style - fullscreen on mobile, fixed width on desktop
+const getPanelStyle = (isMobile) => ({
+    ...(isMobile ? {
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100vh",
+        zIndex: 100, // Below bottom nav (z-index: 1000) so nav remains visible
+        paddingBottom: 0, // No padding - contentStyle handles spacing
+        paddingTop: 0, // No padding - header is fixed
+    } : {
+        width: "400px",
+        flexShrink: 0,
+    }),
     backgroundColor: "#151a22",
-    borderLeft: "1px solid rgba(255, 255, 255, 0.06)",
+    ...(isMobile ? {} : { borderLeft: "1px solid rgba(255, 255, 255, 0.06)" }),
     display: "flex",
     flexDirection: "column",
-    overflowY: "auto",
+    overflowY: isMobile ? "hidden" : "auto", // Hidden on mobile - contentStyle handles scrolling
     height: "100%",
-};
+});
 
-const headerStyle = {
+const getHeaderStyle = (isMobile) => ({
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     padding: "16px 20px",
     borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
     backgroundColor: "#181e27",
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-};
+    ...(isMobile ? {
+        position: "fixed",
+        top: "90px", // Start below Discord banner (50px search + 40px banner)
+        left: 0,
+        right: 0,
+        zIndex: 11, // Above content but below Discord banner (1050)
+    } : {
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+    }),
+});
 
 const headerContentStyle = {
     display: "flex",
@@ -374,6 +464,46 @@ const headerMetaStyle = {
     fontFamily: "'Inter', sans-serif",
 };
 
+const headerActionsStyle = {
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
+};
+
+const backButtonStyle = {
+    background: "none",
+    border: "none",
+    color: "#9aa4b2",
+    cursor: "pointer",
+    padding: "8px",
+    width: "40px",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "4px",
+    transition: "all 0.2s",
+    marginRight: "8px",
+    flexShrink: 0,
+};
+
+const openFullViewButtonStyle = {
+    background: "#151a22",
+    border: "1px solid rgba(255, 255, 255, 0.06)",
+    fontSize: "18px",
+    color: "#9aa4b2",
+    cursor: "pointer",
+    padding: "0",
+    width: "32px",
+    height: "32px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "4px",
+    transition: "all 0.2s",
+    fontFamily: "'Inter', sans-serif",
+};
+
 const closeButtonStyle = {
     background: "none",
     border: "none",
@@ -390,13 +520,22 @@ const closeButtonStyle = {
     transition: "all 0.2s",
 };
 
-const contentStyle = {
-    padding: "20px",
+const contentStyle = (isMobile) => ({
+    padding: isMobile ? "16px" : "20px",
     flex: 1,
+    minHeight: 0,
     display: "flex",
     flexDirection: "column",
-    gap: "20px",
-};
+    gap: isMobile ? "16px" : "20px",
+    overflowY: isMobile ? "auto" : "visible",
+    overflowX: "hidden",
+    ...(isMobile ? {
+        marginTop: "170px", // Start below fixed header (header is ~70-80px tall with padding)
+        paddingTop: "0px", // No extra padding
+        height: "calc(100vh - 90px - 80px - 92px)", // Full height minus Discord banner (90px), header (~80px), and pagination + bottom nav (92px)
+        marginBottom: "92px", // End above pagination (44px) + bottom nav (48px)
+    } : {})
+});
 
 const sectionStyle = {
     backgroundColor: "#151a22",

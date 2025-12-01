@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../utils/api";
 import { useLivePrice } from "../hooks/useLivePrice";
 import { useLiveTrades } from "../hooks/useLiveTrades";
@@ -6,11 +7,13 @@ import { useChartStream } from "../hooks/useChartStream";
 import PriceChart from "./PriceChart";
 import TradeList from "./TradeList";
 import AdvancedMetrics from "./AdvancedMetrics";
+import { useMobile } from "../hooks/useMobile";
 import {
     formatPriceFull,
     formatColoredNumber,
     formatRoi,
     timeAgo,
+    nameToSlug,
 } from "../utils/formatting";
 
 const timeOptions = [
@@ -32,6 +35,8 @@ const timeOptions = [
  * - Lazy-mounted for performance
  */
 export default function ExpandedRowContent({ item }) {
+    const navigate = useNavigate();
+    const isMobile = useMobile();
     const [isMounted, setIsMounted] = useState(false);
     
     // Data states
@@ -167,19 +172,58 @@ export default function ExpandedRowContent({ item }) {
                     role="region"
                     aria-label={`Expanded content for ${item.name}`}
                 >
+                    {/* Header with arrow navigation */}
+                    <div style={expandedHeaderStyle}>
+                        <h3 style={expandedHeaderTitleStyle}>{item.name}</h3>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const slug = nameToSlug(item.name);
+                                navigate(`/item/${item.id}-${encodeURIComponent(slug)}`);
+                            }}
+                            style={openFullViewButtonStyle}
+                            onMouseEnter={(e) => {
+                                Object.assign(e.currentTarget.style, {
+                                    background: "#202737",
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                    color: "#e6e9ef",
+                                });
+                            }}
+                            onMouseLeave={(e) => {
+                                Object.assign(e.currentTarget.style, {
+                                    background: "#151a22",
+                                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                                    color: "#9aa4b2",
+                                });
+                            }}
+                            aria-label="Open Full View"
+                            title="Open Full View"
+                        >
+                            ↗
+                        </button>
+                    </div>
+                    
                     {/* Layout: 2/3 chart, 1/3 trades */}
-                    <div style={topRowStyle}>
+                    <div style={getTopRowStyle(isMobile)}>
                         {/* Chart - 2/3 width */}
-                        <div style={chartSectionStyle}>
+                        <div style={getChartSectionStyle(isMobile)}>
                             <div style={chartHeaderStyle}>
                                 <h4 style={sectionTitleStyle}>Price Chart</h4>
-                                <div style={timeRangeButtonsStyle}>
+                                <div style={{
+                                    ...timeRangeButtonsStyle,
+                                    ...(isMobile ? {
+                                        overflowX: "auto",
+                                        WebkitOverflowScrolling: "touch",
+                                        scrollbarWidth: "thin",
+                                    } : {})
+                                }}>
                                     {timeOptions.map(({ label }) => (
                                         <button
                                             key={label}
                                             onClick={() => setTimeRange(label)}
                                             style={{
                                                 ...timeRangeButtonStyle,
+                                                ...(isMobile ? { flexShrink: 0 } : {}),
                                                 background: label === timeRange ? '#202737' : '#151a22',
                                                 color: label === timeRange ? '#e6e9ef' : '#9aa4b2',
                                                 border: label === timeRange ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.06)',
@@ -195,17 +239,17 @@ export default function ExpandedRowContent({ item }) {
                                     <p style={loadingTextStyle}>Loading chart...</p>
                                 </div>
                             ) : (
-                                <PriceChart priceData={chartData} timeRange={timeRange} height={400} />
+                                <PriceChart priceData={chartData} timeRange={timeRange} height={isMobile && typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.45, 400) : 400} />
                             )}
                         </div>
                         
                         {/* Recent Trades - 1/3 width */}
-                        <div style={tradesSectionStyle}>
+                        <div style={getTradesSectionStyle(isMobile)}>
                             <h4 style={sectionTitleStyle}>Recent Trades</h4>
                             {tradesLoading ? (
                                 <p style={loadingTextStyle}>Loading trades...</p>
                             ) : (
-                                <TradeList trades={trades} maxHeight={400} maxItems={20} />
+                                <TradeList trades={trades} maxHeight={isMobile ? 200 : 400} maxItems={isMobile ? 7 : 20} />
                             )}
                         </div>
                     </div>
@@ -217,7 +261,7 @@ export default function ExpandedRowContent({ item }) {
                         </div>
                     ) : priceData ? (
                         <div style={priceSectionStyle}>
-                            <h4 style={sectionTitleStyle}>Live Prices</h4>
+                            <h4 style={sectionTitleStyle}>Live Priceees</h4>
                             <div style={priceGridStyle}>
                                 <PriceField label="Buy" value={formatPriceFull(priceData.low)} />
                                 <PriceField label="Sell" value={formatPriceFull(priceData.high)} />
@@ -281,20 +325,59 @@ const expandedContentStyle = {
     gap: "20px",
 };
 
-const topRowStyle = {
+const expandedHeaderStyle = {
     display: "flex",
-    gap: "20px",
-    alignItems: "flex-start",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "8px",
 };
 
-const chartSectionStyle = {
-    flex: "0 0 66.666%",
-    width: "66.666%",
+const expandedHeaderTitleStyle = {
+    margin: 0,
+    fontSize: "18px",
+    fontWeight: 600,
+    color: "#e6e9ef",
+    fontFamily: "'Inter', sans-serif",
+};
+
+const openFullViewButtonStyle = {
+    background: "#151a22",
+    border: "1px solid rgba(255, 255, 255, 0.06)",
+    fontSize: "18px",
+    color: "#9aa4b2",
+    cursor: "pointer",
+    padding: "0",
+    width: "32px",
+    height: "32px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "4px",
+    transition: "all 0.2s",
+    fontFamily: "'Inter', sans-serif",
+};
+
+// Top row style - stack on mobile
+const getTopRowStyle = (isMobile) => ({
+    display: "flex",
+    flexDirection: isMobile ? "column" : "row",
+    gap: "20px",
+    alignItems: "flex-start",
+});
+
+// Chart section style - full width on mobile
+const getChartSectionStyle = (isMobile) => ({
+    ...(isMobile ? {
+        width: "100%",
+    } : {
+        flex: "0 0 66.666%",
+        width: "66.666%",
+    }),
     backgroundColor: "#151a22",
     borderRadius: "8px",
     padding: "16px",
     border: "1px solid rgba(255, 255, 255, 0.06)",
-};
+});
 
 const chartHeaderStyle = {
     display: "flex",
@@ -303,14 +386,19 @@ const chartHeaderStyle = {
     marginBottom: "12px",
 };
 
-const tradesSectionStyle = {
-    flex: "0 0 33.333%",
-    width: "33.333%",
+// Trades section style - full width on mobile
+const getTradesSectionStyle = (isMobile) => ({
+    ...(isMobile ? {
+        width: "100%",
+    } : {
+        flex: "0 0 33.333%",
+        width: "33.333%",
+    }),
     backgroundColor: "#151a22",
     borderRadius: "8px",
     padding: "16px",
     border: "1px solid rgba(255, 255, 255, 0.06)",
-};
+});
 
 const priceSectionStyle = {
     backgroundColor: "#151a22",

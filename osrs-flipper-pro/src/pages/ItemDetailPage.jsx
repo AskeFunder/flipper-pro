@@ -24,6 +24,7 @@ import {
 import { taxExemptItems } from "../config/taxExemptItems";
 import { apiFetch, apiFetchJson } from "../utils/api";
 import TradeList from "../components/TradeList";
+import { useMobile } from "../hooks/useMobile";
 
 ChartJS.register(
     LineElement,
@@ -351,6 +352,9 @@ export default function ItemDetailPage() {
     const [selectedGranularity, setSelectedGranularity] = useState('5m');
     const [advancedLoading, setAdvancedLoading] = useState(true);
 
+    // Mobile detection
+    const isMobile = useMobile();
+    
     // Chart and Recent Trades
     const [priceData, setPriceData] = useState([]);
     const [recentTrades, setRecentTrades] = useState([]);
@@ -1585,9 +1589,28 @@ export default function ItemDetailPage() {
     };
 
     return (
-        <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif", backgroundColor: "#0f1115", minHeight: "100vh", color: "#e6e9ef" }}>
+        <div style={{ 
+            padding: isMobile ? "0" : "2rem", 
+            paddingTop: isMobile ? "90px" : "2rem", // Space for search bar (50px) + Discord banner (40px) on mobile
+            paddingBottom: isMobile ? "0" : "2rem", // No bottom padding on mobile - pagination is fixed
+            fontFamily: "'Inter',sans-serif", 
+            backgroundColor: "#0f1115", 
+            minHeight: isMobile ? "calc(100vh - 90px - 48px)" : "100vh", // Resizeable between Discord banner and bottom nav
+            height: isMobile ? "calc(100vh - 90px - 48px)" : "auto",
+            display: isMobile ? "flex" : "block",
+            flexDirection: isMobile ? "column" : "row",
+            overflow: isMobile ? "hidden" : "visible",
+            color: "#e6e9ef" 
+        }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "32px" }}>
+            <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "16px", 
+                marginBottom: isMobile ? "16px" : "32px",
+                flexShrink: 0,
+                padding: isMobile ? "16px" : "0"
+            }}>
                 <img
                     src={`${baseIconURL}/${safe}/64px-${safe}`}
                     alt={canonicalData.name}
@@ -1606,6 +1629,16 @@ export default function ItemDetailPage() {
                 </div>
             </div>
 
+            {/* Content Area - Resizeable between Discord banner and pagination */}
+            <div style={{
+                flex: isMobile ? 1 : "none",
+                minHeight: 0,
+                overflowY: isMobile ? "auto" : "visible",
+                overflowX: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: isMobile ? "16px" : "0"
+            }}>
             {/* Price Chart and Recent Trades Side by Side */}
             <div style={sectionContainerStyle}>
                 <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
@@ -1841,6 +1874,8 @@ export default function ItemDetailPage() {
                     )}
                 </div>
             </div>
+            </div>
+            {/* End Content Area */}
         </div>
     );
 }

@@ -4,12 +4,15 @@ import {
     formatPriceFull,
     formatRoi,
 } from "../utils/formatting";
+import { useMobile } from "../hooks/useMobile";
 
 /**
  * Memoized Advanced Metrics Component
  * Shows metrics for a single selected canonical granularity
  */
 const AdvancedMetrics = React.memo(({ canonicalData, selectedGranularity }) => {
+    const isMobile = useMobile();
+    
     if (!canonicalData || !selectedGranularity) {
         return null;
     }
@@ -46,8 +49,9 @@ const AdvancedMetrics = React.memo(({ canonicalData, selectedGranularity }) => {
     const priceHigh = canonicalData[priceHighKey] != null ? canonicalData[priceHighKey] : null;
     const priceLow = canonicalData[priceLowKey] != null ? canonicalData[priceLowKey] : null;
     
+    // Mobile and Desktop: Grid layout (mobile uses 2 columns, desktop uses 3)
     return (
-        <div style={metricsGridStyle}>
+        <div style={isMobile ? mobileMetricsGridStyle : metricsGridStyle}>
             {volume != null && (
                 <MetricField 
                     label={`Volume (${selectedGranularity})`} 
@@ -117,6 +121,12 @@ const metricsGridStyle = {
     gap: "16px",
 };
 
+const mobileMetricsGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "12px",
+};
+
 const metricItemStyle = {
     display: "flex",
     flexDirection: "column",
@@ -144,6 +154,7 @@ const metricHighlightStyle = {
     color: "#e6e9ef",
     fontFamily: "'Inter', sans-serif",
 };
+
 
 AdvancedMetrics.displayName = 'AdvancedMetrics';
 
