@@ -1,14 +1,15 @@
 import React from "react";
 import BrowseTableRow from "./BrowseTableRow";
+import { isSortValidForMode, TABLE_MODES } from "../constants/tableModes";
 
-export default function BrowseTable({ items, visibleColumns, loading, error, sortBy, order, onSort, onItemClick }) {
+export default function BrowseTable({ items, visibleColumns, loading, error, sortBy, order, onSort, onRowClick, tableMode, expandedRowIds, isRowExpanded, isRowFocused, isRowSelected, onKeyDown }) {
     const shimmerColCount = 10;
 
     if (loading) {
         return (
-            <div style={scrollContainerStyle}>
+            <div style={getScrollContainerStyle(tableMode)}>
             <table style={tableStyle}>
-                <thead>
+                <thead style={theadStyle}>
                     <tr style={headerRowStyle}>
                         <th style={thStyle}>Item</th>
                         <th style={thStyle}>7d</th>
@@ -41,9 +42,9 @@ export default function BrowseTable({ items, visibleColumns, loading, error, sor
 
     if (!items.length && !loading) {
         return (
-            <div style={scrollContainerStyle}>
+            <div style={getScrollContainerStyle(tableMode)}>
             <table style={tableStyle}>
-                <thead>
+                <thead style={theadStyle}>
                     <tr style={headerRowStyle}>
                         <th style={thStyle}>Item</th>
                         <th style={thStyle}>7d</th>
@@ -82,10 +83,16 @@ export default function BrowseTable({ items, visibleColumns, loading, error, sor
     }
 
     return (
-        <div style={scrollContainerStyle}>
-        <table style={tableStyle}>
-            <thead>
-                <tr style={headerRowStyle}>
+        <div 
+            style={getScrollContainerStyle(tableMode)}
+            onKeyDown={onKeyDown}
+            tabIndex={0}
+            role="grid"
+            aria-label="Browse items table"
+        >
+        <table style={tableStyle} role="table">
+            <thead style={theadStyle}>
+                <tr style={headerRowStyle} role="row">
                     <th style={thStyleLeft}>Item</th>
                     <th style={thStyle}>7d</th>
                     {visibleColumns.map((col) => {
@@ -93,16 +100,21 @@ export default function BrowseTable({ items, visibleColumns, loading, error, sor
                             (col.id === "buy_price" && sortBy === "buy_time") ||
                             (col.id === "sell_price" && sortBy === "sell_time") ||
                             sortBy === col.id;
+                        
+                        // Only allow sorting if column is valid for current mode
+                        const canSort = !tableMode || isSortValidForMode(col.id, tableMode);
+                        
                         return (
                             <th 
                                 key={col.id} 
-                                style={thStyle} 
-                                onClick={() => onSort(col.id)}
-                                className="table-header"
+                                style={canSort ? thStyle : { ...thStyle, cursor: "default", opacity: 0.6 }} 
+                                onClick={canSort ? () => onSort(col.id) : undefined}
+                                className={canSort ? "table-header" : ""}
+                                title={!canSort ? "Sorting not available in this mode" : ""}
                             >
                                 <span style={headerContentStyle}>
                                     {col.label}
-                                    {isSorted && (
+                                    {isSorted && canSort && (
                                         <span style={sortIndicatorStyle}>
                                             {order === "asc" ? " ▲" : " ▼"}
                                         </span>
@@ -113,13 +125,17 @@ export default function BrowseTable({ items, visibleColumns, loading, error, sor
                     })}
                 </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
                 {items.map((item) => (
                     <BrowseTableRow
                         key={item.id}
                         item={item}
                         visibleColumns={visibleColumns}
-                        onItemClick={onItemClick}
+                        tableMode={tableMode}
+                        onRowClick={onRowClick}
+                        isExpanded={isRowExpanded ? isRowExpanded(item.id) : false}
+                        isFocused={isRowFocused ? isRowFocused(item.id) : false}
+                        isSelected={isRowSelected ? isRowSelected(item.id) : false}
                     />
                 ))}
             </tbody>
@@ -128,14 +144,19 @@ export default function BrowseTable({ items, visibleColumns, loading, error, sor
     );
 }
 
-const scrollContainerStyle = {
-    width: "100%",
-    maxWidth: "100%",
-    overflowX: "auto",
-    overflowY: "visible",
-    position: "relative",
-    WebkitOverflowScrolling: "touch", // Smooth scrolling on iOS
-    boxSizing: "border-box",
+// Dynamic scroll container style based on table mode
+const getScrollContainerStyle = (tableMode) => {
+    return {
+        width: "100%",
+        maxWidth: "100%",
+        overflowX: "auto",
+        overflowY: "auto", // Enable vertical scrolling in all modes for sticky headers
+        position: "relative",
+        WebkitOverflowScrolling: "touch", // Smooth scrolling on iOS
+        boxSizing: "border-box",
+        flex: 1,
+        minHeight: 0,
+    };
 };
 
 const tableStyle = {
@@ -145,6 +166,12 @@ const tableStyle = {
     minWidth: "100%",
     margin: 0,
     display: "table",
+};
+
+const theadStyle = {
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
 };
 
 const headerRowStyle = {
@@ -168,6 +195,7 @@ const thStyle = {
     textAlign: "right",
     userSelect: "none",
     transition: "background-color 0.2s",
+    backgroundColor: "#151a22", /* Ensure solid background for sticky header */
 };
 
 const thStyleLeft = {

@@ -9,6 +9,8 @@ import {
 } from "../utils/formatting";
 import Sparkline from "./Sparkline";
 import { apiFetch } from "../utils/api";
+import { TABLE_MODES } from "../constants/tableModes";
+import ExpandedRowContent from "./ExpandedRowContent";
 
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
@@ -85,7 +87,7 @@ function getSparklineColor(momentumClass) {
     return colorMap[momentumClass] || "#9aa4b2";
 }
 
-const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
+const BrowseTableRow = React.memo(({ item, visibleColumns, tableMode, onRowClick, isExpanded, isFocused, isSelected }) => {
     const icon = item.icon || `${item.name}.png`;
     const safe = encodeURIComponent(icon.replace(/ /g, "_"));
     const slug = nameToSlug(item.name);
@@ -189,27 +191,41 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
         if (e.target.tagName === "A" || e.target.closest("a")) {
             return;
         }
-        // For normal clicks on the row, do SPA navigation
-        if (onItemClick) {
-            onItemClick(item.id, item.name);
+        // Mode-aware row click handler
+        if (onRowClick) {
+            onRowClick(item.id, item.name);
         }
     };
     
     const handleLinkClick = (e) => {
-        // If it's a normal click (not Ctrl/Cmd/Middle), do SPA navigation
+        // If it's a normal click (not Ctrl/Cmd/Middle), use mode-aware handler
         if (!e.ctrlKey && !e.metaKey && e.button === 0) {
             e.preventDefault();
-            if (onItemClick) {
-                onItemClick(item.id, item.name);
+            if (onRowClick) {
+                onRowClick(item.id, item.name);
             }
         }
         // Otherwise, let browser handle it (Ctrl/Cmd/Middle-click for new tab)
     };
     
+    // Determine row state classes
+    const rowClasses = [
+        'browse-table-row',
+        momentumClass,
+        isExpanded ? 'browse-table-row-expanded' : '',
+        isFocused ? 'browse-table-row-focused' : '',
+        isSelected ? 'browse-table-row-selected' : ''
+    ].filter(Boolean).join(' ');
+    
     return (
+        <>
         <tr 
-            className={`browse-table-row ${momentumClass}`}
+            className={rowClasses}
             onClick={handleRowClick}
+            role="row"
+            aria-expanded={tableMode === TABLE_MODES.ROW ? isExpanded : undefined}
+            aria-selected={tableMode === TABLE_MODES.SIDE ? isSelected : undefined}
+            tabIndex={isFocused ? 0 : -1}
         >
             <td className="browse-table-cell browse-table-cell-item">
                 <a
@@ -303,6 +319,10 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
                 );
             })}
         </tr>
+        {tableMode === TABLE_MODES.ROW && isExpanded && (
+            <ExpandedRowContent item={item} />
+        )}
+    </>
     );
 });
 
