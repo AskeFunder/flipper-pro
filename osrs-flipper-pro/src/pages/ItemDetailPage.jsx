@@ -361,6 +361,7 @@ export default function ItemDetailPage() {
     const chartRef = useRef(null);
 
     // Fetch canonical data first to get item_id and limit
+    // Note: Canonical data rarely changes, so we only fetch once on mount/param change
     useEffect(() => {
         if (!numericItemId && !itemNameSlug) return;
 
@@ -394,9 +395,7 @@ export default function ItemDetailPage() {
         };
 
         fetchCanonical();
-        // Update canonical data every 15 seconds (same as other live data)
-        const interval = setInterval(fetchCanonical, 15000);
-        return () => clearInterval(interval);
+        // Canonical data rarely changes, so we don't poll it
     }, [numericItemId, itemNameSlug]);
 
     // Fetch basic (live) data from /api/prices/latest/:id
@@ -457,10 +456,14 @@ export default function ItemDetailPage() {
             }
         };
 
-        fetchBasic();
+        // Stagger initial fetch slightly to avoid simultaneous requests
+        const initialTimeout = setTimeout(fetchBasic, 50);
         // Update every 15 seconds
         const interval = setInterval(fetchBasic, 15000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(interval);
+        };
     }, [canonicalData]);
 
     // Fetch chart data
@@ -476,9 +479,13 @@ export default function ItemDetailPage() {
                 .catch(console.error);
         };
 
-        fetchChart();
+        // Stagger initial fetch slightly to avoid simultaneous requests
+        const initialTimeout = setTimeout(fetchChart, 100);
         const int = setInterval(fetchChart, 15000);
-        return () => clearInterval(int);
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(int);
+        };
     }, [canonicalData, timeRange]);
 
     // Fetch recent trades
@@ -491,9 +498,13 @@ export default function ItemDetailPage() {
                 .catch(console.error);
         };
 
-        fetchRecent();
+        // Stagger initial fetch slightly to avoid simultaneous requests
+        const initialTimeout = setTimeout(fetchRecent, 150);
         const int = setInterval(fetchRecent, 15000);
-        return () => clearInterval(int);
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(int);
+        };
     }, [canonicalData]);
     
     // Set up zoom callback - use global callback that plugin can access

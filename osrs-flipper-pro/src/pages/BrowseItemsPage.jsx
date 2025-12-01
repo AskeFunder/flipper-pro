@@ -14,7 +14,7 @@ import BrowseTable from "../components/BrowseTable";
 import ColumnPicker from "../components/ColumnPicker";
 import FilterBuilder from "../components/FilterBuilder";
 import { allColumns } from "../constants/column";
-import { apiFetchJson } from "../utils/api";
+import { apiFetch, apiFetchJson } from "../utils/api";
 
 const API_URL = `/api/items/browse`;
 const FILTERS_STORAGE_KEY = "osrs-flipper-filters";
@@ -31,6 +31,7 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
     
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     
     // Load column settings from localStorage on mount
     const [columnSettings, setColumnSettings] = useState(() => {
@@ -84,6 +85,7 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
     useEffect(() => {
         const controller = new AbortController();
         setLoading(true);
+        setError(null); // Clear previous errors
 
         // New endpoint doesn't need columns param - it returns all columns
         // If search came from searchbar, ignore filters (filterless search)
@@ -99,19 +101,61 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
 
         const fetchUrl = `${API_URL}?${q.toString()}`;
         
-        apiFetchJson(fetchUrl, { signal: controller.signal })
-            .then((d) => {
-                console.log('[BrowseItemsPage] Response data:', d);
-                console.log('[BrowseItemsPage] Items count:', d.items?.length || 0);
+        apiFetch(fetchUrl, { signal: controller.signal })
+            .then(async (response) => {
                 if (!controller.signal.aborted) {
-                    setItems(d.items || []);
-                    setTotalPages(d.totalPages || 1);
-                    setTotalRows(d.totalRows || 0);
+                    if (!response.ok) {
+                        // Check for rate limit (429) or other errors
+                        if (response.status === 429) {
+                            setError({
+                                type: 'rate_limit',
+                                message: 'Too many requests. Please wait a moment and try again.',
+                                status: 429
+                            });
+                            setItems([]);
+                            setTotalPages(1);
+                            setTotalRows(0);
+                        } else {
+                            setError({
+                                type: 'api_error',
+                                message: `Error loading items (${response.status}). Please try again.`,
+                                status: response.status
+                            });
+                            setItems([]);
+                            setTotalPages(1);
+                            setTotalRows(0);
+                        }
+                    } else {
+                        const d = await response.json();
+                        console.log('[BrowseItemsPage] Response data:', d);
+                        console.log('[BrowseItemsPage] Items count:', d.items?.length || 0);
+                        setItems(d.items || []);
+                        setTotalPages(d.totalPages || 1);
+                        setTotalRows(d.totalRows || 0);
+                        setError(null); // Clear any previous errors
+                    }
                 }
             })
             .catch((e) => {
-                if (e.name !== "AbortError") {
+                if (e.name !== "AbortError" && !controller.signal.aborted) {
                     console.error('[BrowseItemsPage] Fetch error:', e);
+                    // Check if it's a network error or rate limit
+                    if (e.message && e.message.includes('429')) {
+                        setError({
+                            type: 'rate_limit',
+                            message: 'Too many requests. Please wait a moment and try again.',
+                            status: 429
+                        });
+                    } else {
+                        setError({
+                            type: 'network_error',
+                            message: 'Network error. Please check your connection and try again.',
+                            status: null
+                        });
+                    }
+                    setItems([]);
+                    setTotalPages(1);
+                    setTotalRows(0);
                 }
             })
             .finally(() => {
@@ -335,6 +379,7 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
                 items={items}
                 visibleColumns={visible}
                 loading={loading}
+                error={error}
                 sortBy={sortBy}
                 order={order}
                 onSort={(col) => {

@@ -1,7 +1,7 @@
 import React from "react";
 import BrowseTableRow from "./BrowseTableRow";
 
-export default function BrowseTable({ items, visibleColumns, loading, sortBy, order, onSort, onItemClick }) {
+export default function BrowseTable({ items, visibleColumns, loading, error, sortBy, order, onSort, onItemClick }) {
     const shimmerColCount = 10;
 
     if (loading) {
@@ -39,7 +39,7 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
         );
     }
 
-    if (!items.length) {
+    if (!items.length && !loading) {
         return (
             <div style={scrollContainerStyle}>
             <table style={tableStyle}>
@@ -54,7 +54,26 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                 </thead>
                 <tbody>
                     <tr>
-                        <td colSpan={visibleColumns.length + 2} style={tdStyle}>No items found.</td>
+                        <td colSpan={visibleColumns.length + 2} style={errorStyle}>
+                            {error ? (
+                                <div style={errorContainerStyle}>
+                                    <div style={errorIconStyle}>⚠️</div>
+                                    <div>
+                                        <div style={errorTitleStyle}>
+                                            {error.type === 'rate_limit' ? 'Too Many Requests' : 'Error Loading Items'}
+                                        </div>
+                                        <div style={errorMessageStyle}>{error.message}</div>
+                                        {error.type === 'rate_limit' && (
+                                            <div style={errorHintStyle}>
+                                                Please wait a few seconds before refreshing.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                'No items found.'
+                            )}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -184,4 +203,43 @@ const timeStyle = {
 const iconStyle = {
     borderRadius: 4,
     objectFit: "contain",
+};
+
+const errorStyle = {
+    ...tdStyle,
+    textAlign: "center",
+    padding: "40px 20px",
+};
+
+const errorContainerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    flexDirection: "column",
+};
+
+const errorIconStyle = {
+    fontSize: "48px",
+    lineHeight: 1,
+};
+
+const errorTitleStyle = {
+    fontSize: "16px",
+    fontWeight: 600,
+    color: "#ff5c5c", /* Red for errors */
+    marginBottom: "8px",
+};
+
+const errorMessageStyle = {
+    fontSize: "14px",
+    color: "#9aa4b2", /* Secondary text */
+    marginBottom: "4px",
+};
+
+const errorHintStyle = {
+    fontSize: "12px",
+    color: "#9aa4b2", /* Secondary text */
+    fontStyle: "italic",
+    marginTop: "8px",
 };
