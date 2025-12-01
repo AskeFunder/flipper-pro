@@ -68,6 +68,40 @@ ChartJS.register({
     }
 });
 
+// Register custom plugin to draw vertical grid lines only at tick positions
+ChartJS.register({
+    id: 'tickGridLines',
+    afterDraw: (chart) => {
+        const ctx = chart.ctx;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        
+        if (!xScale || !yScale || !chart.chartArea) return;
+        
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        
+        // Get all tick positions from the scale
+        const ticks = xScale.ticks;
+        if (ticks && ticks.length > 0) {
+            ticks.forEach((tick) => {
+                const x = xScale.getPixelForValue(tick.value);
+                // Only draw if within chart area
+                if (x >= chart.chartArea.left && x <= chart.chartArea.right) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, chart.chartArea.top);
+                    ctx.lineTo(x, chart.chartArea.bottom);
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        ctx.restore();
+    }
+});
+
 // Global callback for zoom - will be set by component
 let globalZoomCallback = null;
 // Global drag state for direct event listeners
@@ -1447,7 +1481,8 @@ export default function ItemDetailPage() {
                     }
                 } : {}),
                 grid: {
-                    color: 'rgba(255, 255, 255, 0.06)', // Borders color for dark mode
+                    display: false, // Disable default grid lines - we'll draw custom ones at tick positions
+                    drawBorder: false,
                 }
             },
             y: { 
