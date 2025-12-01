@@ -245,4 +245,42 @@ router.get('/recent/:id', async (req, res) => {
     }
 });
 
+// ─── GET /prices/sparkline/:itemId?days=7 ────────────────────────────────────────
+// Returns array of { timestamp, price } for sparkline rendering
+// Uses price_1h table, limited to 168 points (7 days * 24 hours)
+router.get('/sparkline/:itemId', async (req, res) => {
+    const itemId = parseInt(req.params.itemId, 10);
+    const days = parseInt(req.query.days || '7', 10);
+    const limit = days * 24; // 168 points for 7 days
+    
+    try {
+        const now = Math.floor(Date.now() / 1000);
+        const since = now - (days * 86400); // days in seconds
+        
+        const sql = `
+            SELECT 
+                timestamp,
+                COALESCE(avg_high, avg_low) AS price
+            FROM price_1h
+            WHERE item_id = $1 
+              AND timestamp >= $2
+            ORDER BY timestamp ASC
+            LIMIT $3
+        `;
+        
+        const { rows } = await db.query(sql, [itemId, since, limit]);
+        
+        // Return array of { timestamp, price }
+        const data = rows.map(row => ({
+            timestamp: row.timestamp,
+            price: parseFloat(row.price) || 0
+        }));
+        
+        return res.json(data);
+    } catch (err) {
+        console.error(`[GET /prices/sparkline/${itemId}] DB ERROR:`, err.stack || err);
+        return res.status(500).json({ error: 'Database error' });
+    }
+});
+
 module.exports = router;
