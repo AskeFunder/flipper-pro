@@ -271,10 +271,16 @@ router.get('/sparkline/:itemId', async (req, res) => {
         const { rows } = await db.query(sql, [itemId, since, limit]);
         
         // Return array of { timestamp, price }
-        const data = rows.map(row => ({
-            timestamp: row.timestamp,
-            price: parseFloat(row.price) || 0
-        }));
+        // Only include rows with valid prices (null/NaN filtered out)
+        const data = rows
+            .map(row => {
+                const price = row.price != null ? parseFloat(row.price) : null;
+                return {
+                    timestamp: row.timestamp,
+                    price: (price != null && !isNaN(price)) ? price : null
+                };
+            })
+            .filter(row => row.price != null); // Filter out null prices
         
         return res.json(data);
     } catch (err) {
