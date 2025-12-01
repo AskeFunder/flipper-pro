@@ -1,47 +1,47 @@
-/* Pagination button hover effects */
+/* Pagination button hover effects - Dark Mode */
 .pagination-button:not(:disabled):hover {
-    background-color: #f3f4f6 !important;
-    border-color: #9ca3af !important;
+    background-color: #2a3245 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2) !important;
 }
 
 .pagination-page-button:not([style*="background-color: rgb(30, 30, 30)"]):hover {
-    background-color: #f3f4f6 !important;
-    border-color: #9ca3af !important;
+    background-color: #2a3245 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2) !important;
 }
 
-/* Action button hover effects */
+/* Action button hover effects - Dark Mode */
 .action-button:hover {
-    background-color: #f9fafb !important;
-    border-color: #9ca3af !important;
+    background-color: #2a3245 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2) !important;
 }
 
-/* Column picker close button hover */
+/* Column picker close button hover - Dark Mode */
 .column-picker-close:hover {
-    background-color: #e5e7eb !important;
-    color: #111827 !important;
+    background-color: #202737 !important;
+    color: #e6e9ef !important;
 }
 
-/* Column picker done button hover */
+/* Column picker done button hover - Dark Mode */
 .column-picker-done:hover {
-    background-color: #111827 !important;
+    background-color: #2a3245 !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Table header hover effect */
+/* Table header hover effect - Dark Mode */
 .table-header:hover {
-    background-color: #f3f4f6 !important;
+    background-color: #202737 !important;
 }
 
-/* Checkbox label hover effect */
+/* Checkbox label hover effect - Dark Mode */
 .checkbox-label:hover {
-    background-color: #f9fafb !important;
+    background-color: #202737 !important;
 }
 
 /* Ensure checkbox items wrap completely and aren't cut off */
@@ -50,66 +50,337 @@
     word-break: keep-all;
 }
 
+/* Custom Checkbox Styling - Dark Mode */
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    background-color: #202737;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+input[type="checkbox"]:hover {
+    background-color: #2a3245;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+input[type="checkbox"]:checked {
+    background-color: #5865F2;
+    border-color: #5865F2;
+}
+
+input[type="checkbox"]:checked:hover {
+    background-color: #4752C4;
+    border-color: #4752C4;
+}
+
+input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
 /* Ensure flex container allows proper wrapping */
 [style*="flex-wrap: wrap"] {
     align-content: flex-start;
 }
 
-/* Filter input focus effect */
+/* Filter input focus effect - Dark Mode */
 input[type="text"]:focus {
     outline: none;
-    border-color: #1e1e1e !important;
-    box-shadow: 0 0 0 3px rgba(30, 30, 30, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Browse table row hover effect */
+/* ============================================
+   DARK TRADING TERMINAL UI - TABLE STYLES
+   ============================================ */
+
+/* Table Container */
+.browse-table-container {
+    background-color: #151a22; /* Table surface */
+    border-radius: 4px;
+}
+
+/* Table Rows - Base */
+.browse-table-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06); /* Subtle border */
+    background-color: #181e27; /* Row background */
+    min-height: 36px; /* Increased row height */
+}
+
 .browse-table-row:hover {
-    background-color: #f9fafb !important;
+    background-color: #202737 !important; /* Row hover */
 }
 
-/* Discord CTA Styles - Compact Pill Design */
-.discord-cta {
-    width: 100%;
-    background-color: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 999px;
-    padding: 12px 18px;
-    margin-bottom: 1.5rem;
+/* Table Cells */
+.browse-table-cell {
+    padding: 10px 12px; /* Increased vertical padding */
+    font-size: 13px;
+    color: #e6e9ef; /* Primary text */
+}
+
+.browse-table-cell-primary {
+    color: #e6e9ef; /* Primary text - high emphasis */
+    font-weight: 500;
+}
+
+.browse-table-cell-secondary {
+    color: #9aa4b2; /* Secondary text - dimmed */
+    font-weight: 400;
+}
+
+/* Momentum Colors */
+.browse-table-row.momentum-bright-green {
+    background-color: rgba(43, 217, 127, 0.08); /* Green: #2bd97f */
+}
+
+.browse-table-row.momentum-red {
+    background-color: rgba(255, 92, 92, 0.08); /* Red: #ff5c5c */
+}
+
+.browse-table-row.momentum-yellow {
+    background-color: rgba(242, 201, 76, 0.08); /* Yellow: #f2c94c */
+}
+
+.browse-table-row.momentum-grey {
+    background-color: #181e27; /* Grey: default row color */
+}
+
+/* Table Header */
+.browse-table-header-row {
+    background-color: #151a22; /* Table surface */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.browse-table-header {
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #9aa4b2; /* Secondary text */
+    text-align: right;
+    user-select: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.browse-table-header:hover {
+    background-color: #202737 !important;
+}
+
+.browse-table-header-item {
+    text-align: left;
+}
+
+/* Value Colors */
+.browse-table-value-positive {
+    color: #2bd97f; /* Green */
+}
+
+.browse-table-value-negative {
+    color: #ff5c5c; /* Red */
+}
+
+.browse-table-value-null {
+    color: #9aa4b2; /* Grey */
+}
+
+.browse-table-value-default {
+    color: #e6e9ef; /* Primary text */
+}
+
+.browse-table-value-primary {
+    color: #e6e9ef; /* Primary text */
+    font-weight: 500;
+}
+
+.browse-table-time {
+    font-size: 11px;
+    color: #9aa4b2; /* Secondary text */
+    margin-top: 2px;
+}
+
+/* Item Link */
+.browse-item-link {
+    color: #e6e9ef;
+    text-decoration: none;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 12px;
-    align-items: stretch;
 }
 
-.discord-cta-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
+.browse-item-link:hover {
+    color: #e6e9ef;
 }
 
-.discord-cta-icon {
+.browse-item-name {
+    color: #e6e9ef;
+}
+
+.browse-item-icon {
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+/* Empty State */
+.browse-table-empty {
+    text-align: center;
+    color: #9aa4b2;
+    padding: 40px 20px;
+}
+
+/* Skeleton Rows */
+.browse-table-skeleton-row {
+    background-color: #181e27;
+}
+
+/* Custom Scrollbar for Dark Theme - Global */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #202737 #151a22;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #151a22;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #202737;
+    border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #2a3245;
+}
+
+/* Table-specific scrollbar (keep for compatibility) */
+.browse-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.browse-table-container::-webkit-scrollbar-track {
+    background: #151a22;
+}
+
+.browse-table-container::-webkit-scrollbar-thumb {
+    background: #202737;
+    border-radius: 4px;
+}
+
+.browse-table-container::-webkit-scrollbar-thumb:hover {
+    background: #2a3245;
+}
+
+/* Discord Badge - Floating Expandable Badge */
+.discord-badge {
+    position: relative;
     display: flex;
     align-items: center;
-    color: #5865F2;
+    background-color: transparent;
+    border: none;
+    border-radius: 999px;
+    padding: 0;
+    width: 44px;
+    height: 44px;
+    overflow: visible;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.discord-badge:hover {
+    width: auto;
+    min-width: 44px;
+    height: 44px;
+    padding-right: 14px;
+    background-color: #151a22;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.discord-badge-icon {
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
+    background-color: #5865F2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(88, 101, 242, 0.3);
 }
 
-.discord-cta-text {
-    font-size: 14px;
-    color: #374151;
-    font-family: 'Inter', sans-serif;
-    line-height: 1.5;
+.discord-badge-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.discord-badge:hover .discord-badge-icon {
+    background-color: #4752C4;
+    box-shadow: 0 2px 8px rgba(88, 101, 242, 0.4);
+}
+
+.discord-badge-expanded {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 12px;
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.discord-badge:hover .discord-badge-expanded {
+    opacity: 1;
+    width: auto;
+    pointer-events: auto;
+}
+
+.discord-badge-content {
+    display: flex;
+    align-items: center;
     flex: 1;
+    min-width: 0;
 }
 
-.discord-cta-button {
+.discord-badge-text {
+    font-size: 13px;
+    color: #e6e9ef;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.discord-badge-button {
     background-color: #5865F2;
     color: #ffffff;
     border: none;
     border-radius: 999px;
-    padding: 10px 20px;
-    font-size: 14px;
+    padding: 6px 14px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     display: flex;
@@ -118,28 +389,40 @@ input[type="text"]:focus {
     font-family: 'Inter', sans-serif;
     transition: all 0.2s;
     text-decoration: none;
-    width: 100%;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
-.discord-cta-button:hover {
+.discord-badge-button:hover {
     background-color: #4752C4;
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(88, 101, 242, 0.3);
 }
 
-/* Responsive: Desktop layout - single horizontal row */
-@media (min-width: 768px) {
-    .discord-cta {
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 20px;
-    }
-
-    .discord-cta-button {
+/* Responsive: Stack on mobile when expanded */
+@media (max-width: 768px) {
+    .discord-badge:hover {
+        flex-direction: column;
+        align-items: stretch;
         width: auto;
-        min-width: 160px;
-        flex-shrink: 0;
+        max-width: 300px;
+        padding: 10px 14px;
+    }
+    
+    .discord-badge-expanded {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        margin-left: 0;
+        margin-top: 8px;
+    }
+    
+    .discord-badge-text {
+        white-space: normal;
+    }
+    
+    .discord-badge-button {
+        width: 100%;
     }
 }
 

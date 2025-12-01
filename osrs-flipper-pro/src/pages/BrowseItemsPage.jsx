@@ -13,7 +13,6 @@ import {
 import BrowseTable from "../components/BrowseTable";
 import ColumnPicker from "../components/ColumnPicker";
 import FilterBuilder from "../components/FilterBuilder";
-import DiscordBanner from "../components/DiscordBanner";
 import { allColumns } from "../constants/column";
 import { apiFetchJson } from "../utils/api";
 
@@ -227,10 +226,8 @@ export default function BrowseItemsPage({ onItemClick, isSearchFromSearchBar = f
     const visible = columnSettings.filter((c) => c.visible);
 
     return (
-        <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif", width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box" }}>
-            <DiscordBanner />
-
-            <h2>Browse Items</h2>
+        <div style={{ padding: "1rem 2rem 2rem 2rem", fontFamily: "'Inter',sans-serif", width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box", backgroundColor: "#0f1115" }}>
+            <h2 style={{ color: "#e6e9ef" }}>Browse Items</h2>
 
             <div style={actionButtonsStyle}>
                 <button 
@@ -459,7 +456,7 @@ const paginationStyle = {
     gap: "8px",
     marginTop: "32px",
     padding: "20px",
-    background: "#f9fafb",
+    background: "#151a22", /* Table surface */
     borderRadius: "8px",
     flexWrap: "wrap",
 };
@@ -469,25 +466,25 @@ const paginationButtonStyle = {
     fontSize: "14px",
     fontWeight: 500,
     borderRadius: "6px",
-    border: "1px solid #d1d5db",
-    backgroundColor: "#ffffff",
-    color: "#374151",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    backgroundColor: "#202737", /* Button base */
+    color: "#e6e9ef",
     cursor: "pointer",
     transition: "all 0.2s",
-    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.2)",
 };
 
 const disabledButtonStyle = {
     ...paginationButtonStyle,
     opacity: 0.4,
     cursor: "not-allowed",
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#181e27",
     boxShadow: "none",
 };
 
 const paginationInfoStyle = {
     fontSize: "14px",
-    color: "#374151",
+    color: "#9aa4b2",
     fontWeight: 500,
     padding: "0 20px",
     textAlign: "center",
@@ -505,21 +502,21 @@ const pageNumberButtonStyle = {
     fontSize: "14px",
     fontWeight: 500,
     borderRadius: "6px",
-    border: "1px solid #d1d5db",
-    backgroundColor: "#ffffff",
-    color: "#374151",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    backgroundColor: "#202737",
+    color: "#e6e9ef",
     cursor: "pointer",
     minWidth: "44px",
     textAlign: "center",
     transition: "all 0.2s",
-    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.2)",
 };
 
 const pageNumberActiveStyle = {
     ...pageNumberButtonStyle,
-    backgroundColor: "#1e1e1e",
+    backgroundColor: "#5865F2",
     color: "#fff",
-    borderColor: "#1e1e1e",
+    borderColor: "#5865F2",
     fontWeight: "bold",
 };
 
@@ -534,9 +531,9 @@ const actionButtonStyle = {
     padding: "10px 20px",
     fontSize: "14px",
     fontWeight: 500,
-    color: "#374151",
-    background: "#ffffff",
-    border: "1px solid #d1d5db",
+    color: "#e6e9ef",
+    background: "#202737", /* Button base */
+    border: "1px solid rgba(255, 255, 255, 0.1)",
     borderRadius: "6px",
     cursor: "pointer",
     transition: "all 0.2s",
@@ -552,11 +549,13 @@ const searchInputStyle = {
     width: "100%",
     padding: "12px 40px 12px 16px",
     fontSize: "14px",
-    border: "1px solid #d1d5db",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
     borderRadius: "6px",
     outline: "none",
     transition: "all 0.2s",
     fontFamily: "'Inter',sans-serif",
+    backgroundColor: "#151a22",
+    color: "#e6e9ef",
 };
 
 const clearSearchButtonStyle = {
@@ -567,7 +566,7 @@ const clearSearchButtonStyle = {
     background: "transparent",
     border: "none",
     fontSize: "24px",
-    color: "#9ca3af",
+    color: "#9aa4b2",
     cursor: "pointer",
     padding: "0 8px",
     lineHeight: "1",

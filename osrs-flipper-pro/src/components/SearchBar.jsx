@@ -149,14 +149,14 @@ export default function SearchBar({ onItemClick, onSearch }) {
                     placeholder="Search"
                     style={{
                         padding: "8px 12px 8px 40px",
-                        border: "1px solid #ccc",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
                         borderRadius: "4px",
-                        backgroundColor: "#fff",
-                        color: "#111",
+                        backgroundColor: "#151a22", /* Table surface */
+                        color: "#e6e9ef",
                         width: "300px",
                         fontSize: "14px",
                         outline: "none",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
                     }}
                 />
                 {query.trim() && !isLoadingItems && (
@@ -167,17 +167,17 @@ export default function SearchBar({ onItemClick, onSearch }) {
                             left: 0,
                             right: 0,
                             marginTop: "4px",
-                            backgroundColor: "#1e1e1e",
-                            border: "1px solid #333",
+                            backgroundColor: "#151a22", /* Table surface */
+                            border: "1px solid rgba(255, 255, 255, 0.06)",
                             borderRadius: "4px",
-                            boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
+                            boxShadow: "0 4px 6px rgba(0,0,0,0.5)",
                             maxHeight: "300px",
                             overflowY: "auto",
                             zIndex: 1001,
                         }}
                     >
                         {results.length === 0 ? (
-                            <div style={{ padding: "12px", color: "#999", textAlign: "center" }}>
+                            <div style={{ padding: "12px", color: "#9aa4b2", textAlign: "center" }}>
                                 No items found
                             </div>
                         ) : (
@@ -193,11 +193,11 @@ export default function SearchBar({ onItemClick, onSearch }) {
                                             display: "flex",
                                             alignItems: "center",
                                             gap: "12px",
-                                            borderBottom: "1px solid #333",
-                                            color: "#fff",
+                                            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+                                            color: "#e6e9ef",
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = "#2a2a2a";
+                                            e.currentTarget.style.backgroundColor = "#202737";
                                         }}
                                         onMouseLeave={(e) => {
                                             e.currentTarget.style.backgroundColor = "transparent";
