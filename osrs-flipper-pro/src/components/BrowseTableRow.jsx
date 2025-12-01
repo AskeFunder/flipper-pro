@@ -95,13 +95,21 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
     const momentumClass = getMomentumColor(item.trend_1h, item.trend_24h);
     const sparklineColor = getSparklineColor(momentumClass);
     
-    // Sparkline data state
-    const [sparklineData, setSparklineData] = useState(null);
+    // Sparkline data - use embedded data from browse endpoint if available
+    // Fallback to separate fetch if not present (backward compatibility)
+    const [sparklineData, setSparklineData] = useState(item.sparkline || null);
     const [sparklineLoading, setSparklineLoading] = useState(false);
     const abortControllerRef = useRef(null);
     
-    // Lazy fetch sparkline data
+    // Only fetch separately if sparkline data is not embedded in item
     useEffect(() => {
+        // If sparkline is already in item data, use it
+        if (item.sparkline && Array.isArray(item.sparkline)) {
+            setSparklineData(item.sparkline);
+            return;
+        }
+        
+        // Fallback: fetch separately if not embedded (backward compatibility)
         if (!item.id) return;
         
         // Check cache first
@@ -174,7 +182,7 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
         return () => {
             controller.abort();
         };
-    }, [item.id]);
+    }, [item.id, item.sparkline]);
     
     const handleRowClick = (e) => {
         // Don't navigate if clicking on a link (let browser handle it)
