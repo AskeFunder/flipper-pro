@@ -11,6 +11,7 @@ router.get("/browse", async (req, res) => {
             sortBy = "margin",
             order = "desc",
             search,
+            includeSparklines = "true", // Default to true, can be set to "false" to disable
             ...queryFilters
         } = req.query;
 
@@ -189,9 +190,36 @@ router.get("/browse", async (req, res) => {
             ${whereClause}
         `;
 
-        // Main data query
+        // Main data query - include sparkline data if requested
+        const includeSparklinesFlag = includeSparklines === "true" || includeSparklines === true;
+        
+        let sparklineSubquery = "";
+        if (includeSparklinesFlag) {
+            const now = Math.floor(Date.now() / 1000);
+            const since = now - (7 * 86400); // 7 days in seconds
+            const sparklineLimit = 168; // 7 days * 24 hours
+            
+            sparklineSubquery = `, (
+                SELECT COALESCE(json_agg(
+                    json_build_object(
+                        'timestamp', timestamp,
+                        'price', COALESCE(avg_high, avg_low)
+                    ) ORDER BY timestamp ASC
+                ) FILTER (WHERE COALESCE(avg_high, avg_low) IS NOT NULL), '[]'::json)
+                FROM (
+                    SELECT timestamp, avg_high, avg_low
+                    FROM price_1h
+                    WHERE item_id = canonical_items.item_id
+                      AND timestamp >= ${since}
+                      AND (avg_high IS NOT NULL OR avg_low IS NOT NULL)
+                    ORDER BY timestamp ASC
+                    LIMIT ${sparklineLimit}
+                ) AS sparkline_data
+            ) AS sparkline`;
+        }
+
         const dataSql = `
-            SELECT ${selectColumns.join(", ")}
+            SELECT ${selectColumns.join(", ")}${sparklineSubquery}
             FROM canonical_items
             ${whereClause}
             ORDER BY ${resolvedSort} ${sortOrder} ${nullsPosition}
@@ -207,8 +235,39 @@ router.get("/browse", async (req, res) => {
 
         const dataResult = await db.query(dataSql, params);
 
+        // Process results - parse sparkline JSON and filter out null prices
+        const processedItems = dataResult.rows.map(row => {
+            if (includeSparklinesFlag && row.sparkline) {
+                // json_agg returns a JSON array, parse if it's a string
+                let sparkline = row.sparkline;
+                if (typeof sparkline === 'string') {
+                    try {
+                        sparkline = JSON.parse(sparkline);
+                    } catch (e) {
+                        sparkline = [];
+                    }
+                }
+                
+                // Ensure it's an array and filter out null prices
+                if (!Array.isArray(sparkline)) {
+                    sparkline = [];
+                }
+                
+                row.sparkline = sparkline
+                    .map(point => {
+                        const price = point.price != null ? parseFloat(point.price) : null;
+                        return {
+                            timestamp: point.timestamp,
+                            price: (price != null && !isNaN(price)) ? price : null
+                        };
+                    })
+                    .filter(point => point.price != null);
+            }
+            return row;
+        });
+
         res.json({ 
-            items: dataResult.rows, 
+            items: processedItems, 
             totalPages,
             totalRows
         });
