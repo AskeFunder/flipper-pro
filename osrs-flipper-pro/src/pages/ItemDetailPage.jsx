@@ -23,6 +23,7 @@ import {
 } from "../utils/formatting";
 import { taxExemptItems } from "../config/taxExemptItems";
 import { apiFetch, apiFetchJson } from "../utils/api";
+import TradeList from "../components/TradeList";
 
 ChartJS.register(
     LineElement,
@@ -1729,43 +1730,7 @@ export default function ItemDetailPage() {
                     {/* Recent Trades - 20% width */}
                     <div style={{ flex: '0 0 20%', width: '20%' }}>
                         <h2 style={sectionTitleStyle}>Recent Trades</h2>
-                        <div style={{ maxHeight: '60vh', overflowY: 'auto', overflowX: 'hidden' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)' }}>
-                                <thead>
-                                    <tr style={{ background: "#181e27", borderBottom: "2px solid rgba(255,255,255,0.06)" }}>
-                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "35%", color: "#e6e9ef" }}>Time</th>
-                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "15%", color: "#e6e9ef" }}>Type</th>
-                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "50%", color: "#e6e9ef" }}>Price</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentTrades.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#9aa4b2" }}>
-                                                No recent trades available
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        recentTrades.map((t, i) => {
-                                            // Backend sends: 'sell' for high prices, 'buy' for low prices
-                                            // We want: high = Buy (green), low = Sell (red)
-                                            // So invert the logic
-                                            const isBuy = t.type === 'sell';
-                                            const label = isBuy ? 'BUY' : 'SELL';
-                                            const rowColor = isBuy ? 'rgba(43, 217, 127, 0.1)' : 'rgba(255, 92, 92, 0.1)';
-                                            const textColor = isBuy ? '#2bd97f' : '#ff5c5c';
-                                            return (
-                                                <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
-                                                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{timeAgo(t.ts)}</td>
-                                                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{label}</td>
-                                                    <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{formatPriceFull(t.price)}</td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                        <TradeList trades={recentTrades} maxHeight={600} maxItems={20} />
                     </div>
                 </div>
             </div>

@@ -39,6 +39,23 @@
     background-color: #202737 !important;
 }
 
+/* Table mode selector button hover - Dark Mode */
+button[title*="Panel"]:hover,
+button[title*="Rows"]:hover,
+button[title*="Horizontal"]:hover {
+    background-color: #2a3245 !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    transform: translateY(-1px);
+}
+
+button[title*="Panel"][style*="background-color: rgb(88, 101, 242)"]:hover,
+button[title*="Rows"][style*="background-color: rgb(88, 101, 242)"]:hover,
+button[title*="Horizontal"][style*="background-color: rgb(88, 101, 242)"]:hover {
+    background-color: #4752C4 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(88, 101, 242, 0.3);
+}
+
 /* Checkbox label hover effect - Dark Mode */
 .checkbox-label:hover {
     background-color: #202737 !important;
@@ -120,10 +137,71 @@ input[type="text"]:focus {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06); /* Subtle border */
     background-color: #181e27; /* Row background */
     min-height: 36px; /* Increased row height */
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
 }
 
 .browse-table-row:hover {
     background-color: #202737 !important; /* Row hover */
+}
+
+/* Focus state for keyboard navigation */
+.browse-table-row-focused {
+    background-color: #202737 !important;
+    box-shadow: inset 0 0 0 2px #5865F2;
+    outline: none;
+}
+
+.browse-table-row-focused:hover {
+    background-color: #252b3d !important;
+}
+
+/* Selected state for side panel mode */
+.browse-table-row-selected {
+    background-color: rgba(88, 101, 242, 0.15) !important;
+    border-left: 3px solid #5865F2;
+}
+
+.browse-table-row-selected:hover {
+    background-color: rgba(88, 101, 242, 0.2) !important;
+}
+
+/* Expanded row state */
+.browse-table-row-expanded {
+    background-color: #1a2029 !important;
+    border-bottom: 2px solid rgba(88, 101, 242, 0.3);
+}
+
+/* Animation for expanded row content */
+@keyframes expandRow {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px;
+    }
+}
+
+.browse-table-row-expanded + tr[role="row"] {
+    animation: expandRow 0.3s ease-out;
+}
+
+/* Animation for side panel */
+@keyframes slideInPanel {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+[role="complementary"][aria-label*="Side panel"] {
+    animation: slideInPanel 0.3s ease-out;
 }
 
 /* Table Cells */

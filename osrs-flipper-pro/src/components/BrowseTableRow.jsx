@@ -9,6 +9,8 @@ import {
 } from "../utils/formatting";
 import Sparkline from "./Sparkline";
 import { apiFetch } from "../utils/api";
+import { TABLE_MODES } from "../constants/tableModes";
+import ExpandedRowContent from "./ExpandedRowContent";
 
 const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
 
@@ -85,7 +87,7 @@ function getSparklineColor(momentumClass) {
     return colorMap[momentumClass] || "#9aa4b2";
 }
 
-const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
+const BrowseTableRow = React.memo(({ item, visibleColumns, tableMode, onRowClick, isExpanded, isFocused, isSelected }) => {
     const icon = item.icon || `${item.name}.png`;
     const safe = encodeURIComponent(icon.replace(/ /g, "_"));
     const slug = nameToSlug(item.name);
@@ -94,6 +96,10 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
     // Get momentum color based on trends
     const momentumClass = getMomentumColor(item.trend_1h, item.trend_24h);
     const sparklineColor = getSparklineColor(momentumClass);
+    
+    // Ref for scrolling to expanded row
+    const rowRef = useRef(null);
+    const prevExpandedRef = useRef(false);
     
     // Sparkline data - use embedded data from browse endpoint if available
     // Fallback to separate fetch if not present (backward compatibility)
@@ -184,32 +190,90 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
         };
     }, [item.id, item.sparkline]);
     
+    // Scroll to row when it becomes expanded (only in row mode)
+    useEffect(() => {
+        if (tableMode === TABLE_MODES.ROW && isExpanded && !prevExpandedRef.current && rowRef.current) {
+            // Small delay to ensure DOM is updated (including ExpandedRowContent)
+            setTimeout(() => {
+                if (rowRef.current) {
+                    // Find the scrollable container (the div with overflow)
+                    let scrollContainer = rowRef.current.closest('div[style*="overflow"]');
+                    if (!scrollContainer) {
+                        // Fallback: find parent table container
+                        scrollContainer = rowRef.current.closest('table')?.parentElement;
+                    }
+                    
+                    if (scrollContainer) {
+                        // Find the sticky header (thead)
+                        const table = rowRef.current.closest('table');
+                        const thead = table?.querySelector('thead');
+                        const headerHeight = thead ? thead.getBoundingClientRect().height : 50;
+                        
+                        // Get current scroll position
+                        const containerScrollTop = scrollContainer.scrollTop;
+                        
+                        // Get row position relative to container
+                        const rowRect = rowRef.current.getBoundingClientRect();
+                        const containerRect = scrollContainer.getBoundingClientRect();
+                        
+                        // Calculate how much we need to scroll
+                        // We want the row to be at the top of the visible area, just below the sticky header
+                        const rowTopRelativeToContainer = rowRect.top - containerRect.top + containerScrollTop;
+                        const targetScrollTop = rowTopRelativeToContainer - headerHeight;
+                        
+                        // Smooth scroll
+                        scrollContainer.scrollTo({
+                            top: targetScrollTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                }
+            }, 150);
+        }
+        prevExpandedRef.current = isExpanded;
+    }, [isExpanded, tableMode]);
+    
     const handleRowClick = (e) => {
         // Don't navigate if clicking on a link (let browser handle it)
         if (e.target.tagName === "A" || e.target.closest("a")) {
             return;
         }
-        // For normal clicks on the row, do SPA navigation
-        if (onItemClick) {
-            onItemClick(item.id, item.name);
+        // Mode-aware row click handler
+        if (onRowClick) {
+            onRowClick(item.id, item.name);
         }
     };
     
     const handleLinkClick = (e) => {
-        // If it's a normal click (not Ctrl/Cmd/Middle), do SPA navigation
+        // If it's a normal click (not Ctrl/Cmd/Middle), use mode-aware handler
         if (!e.ctrlKey && !e.metaKey && e.button === 0) {
             e.preventDefault();
-            if (onItemClick) {
-                onItemClick(item.id, item.name);
+            if (onRowClick) {
+                onRowClick(item.id, item.name);
             }
         }
         // Otherwise, let browser handle it (Ctrl/Cmd/Middle-click for new tab)
     };
     
+    // Determine row state classes
+    const rowClasses = [
+        'browse-table-row',
+        momentumClass,
+        isExpanded ? 'browse-table-row-expanded' : '',
+        isFocused ? 'browse-table-row-focused' : '',
+        isSelected ? 'browse-table-row-selected' : ''
+    ].filter(Boolean).join(' ');
+    
     return (
+        <>
         <tr 
-            className={`browse-table-row ${momentumClass}`}
+            ref={rowRef}
+            className={rowClasses}
             onClick={handleRowClick}
+            role="row"
+            aria-expanded={tableMode === TABLE_MODES.ROW ? isExpanded : undefined}
+            aria-selected={tableMode === TABLE_MODES.SIDE ? isSelected : undefined}
+            tabIndex={isFocused ? 0 : -1}
         >
             <td className="browse-table-cell browse-table-cell-item">
                 <a
@@ -303,6 +367,10 @@ const BrowseTableRow = React.memo(({ item, visibleColumns, onItemClick }) => {
                 );
             })}
         </tr>
+        {tableMode === TABLE_MODES.ROW && isExpanded && (
+            <ExpandedRowContent item={item} />
+        )}
+    </>
     );
 });
 

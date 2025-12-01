@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Tooltip from "./Tooltip";
 import { allColumns } from "../constants/column";
+import { isColumnAllowedInMode, TABLE_MODES } from "../constants/tableModes";
 import "../styles/browse.css";
 
 const pickerContainerStyle = {
@@ -193,7 +194,7 @@ const categoryDescriptions = {
 
 const SAVED_PRESETS_KEY = "osrs-flipper-saved-column-presets";
 
-export default function ColumnPicker({ columnSettings, onToggleColumn, onClose, onResetToDefaults }) {
+export default function ColumnPicker({ columnSettings, onToggleColumn, onClose, onResetToDefaults, tableMode = TABLE_MODES.HORIZONTAL }) {
     const [savedPresets, setSavedPresets] = useState(() => {
         try {
             const saved = localStorage.getItem(SAVED_PRESETS_KEY);
@@ -206,7 +207,18 @@ export default function ColumnPicker({ columnSettings, onToggleColumn, onClose, 
     const [presetName, setPresetName] = useState("");
     const [showLoadDialog, setShowLoadDialog] = useState(false);
 
-    const groups = columnSettings.reduce((acc, col) => {
+    // Filter columns based on mode
+    // In restricted modes (side/row), only show scan columns
+    // In horizontal mode, show all columns
+    const filteredColumns = useMemo(() => {
+        if (tableMode === TABLE_MODES.HORIZONTAL) {
+            return columnSettings; // All columns in horizontal mode
+        }
+        // In restricted modes, only show scan columns
+        return columnSettings.filter(col => isColumnAllowedInMode(col.id, tableMode));
+    }, [columnSettings, tableMode]);
+
+    const groups = filteredColumns.reduce((acc, col) => {
         (acc[col.category] = acc[col.category] || []).push(col);
         return acc;
     }, {});
@@ -243,7 +255,14 @@ export default function ColumnPicker({ columnSettings, onToggleColumn, onClose, 
     return (
         <div style={pickerContainerStyle}>
             <div style={pickerHeaderStyle}>
-                <h3 style={pickerTitleStyle}>Select Columns</h3>
+                <div>
+                    <h3 style={pickerTitleStyle}>Select Columns</h3>
+                    {tableMode !== TABLE_MODES.HORIZONTAL && (
+                        <div style={{ fontSize: "12px", color: "#9aa4b2", marginTop: "4px" }}>
+                            Restricted mode: Only scan columns available
+                        </div>
+                    )}
+                </div>
                 <button onClick={onClose} style={closeButtonStyle} className="column-picker-close">×</button>
             </div>
             <div style={pickerContentStyle}>
