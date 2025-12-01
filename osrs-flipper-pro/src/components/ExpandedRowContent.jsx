@@ -6,6 +6,12 @@ import { useChartStream } from "../hooks/useChartStream";
 import PriceChart from "./PriceChart";
 import TradeList from "./TradeList";
 import AdvancedMetrics from "./AdvancedMetrics";
+import {
+    formatPriceFull,
+    formatColoredNumber,
+    formatRoi,
+    timeAgo,
+} from "../utils/formatting";
 
 const timeOptions = [
     { label: '4H', ms: 4 * 3600e3, granularity: '4h' },
@@ -38,6 +44,10 @@ export default function ExpandedRowContent({ item }) {
     
     // Chart state
     const [timeRange, setTimeRange] = useState('12H');
+    
+    // Canonical granularity selector (independent from chart granularity)
+    const [selectedCanonicalGranularity, setSelectedCanonicalGranularity] = useState('1h');
+    const canonicalGranularityOptions = ['5m', '1h', '6h', '24h', '7d', '1m'];
     
     // Use custom hooks for patch updates
     const { priceData, isInitialLoading: priceLoading } = useLivePrice(canonicalData);
@@ -200,13 +210,56 @@ export default function ExpandedRowContent({ item }) {
                         </div>
                     </div>
                     
+                    {/* Live Price Block */}
+                    {priceLoading ? (
+                        <div style={priceSectionStyle}>
+                            <p style={loadingTextStyle}>Loading prices...</p>
+                        </div>
+                    ) : priceData ? (
+                        <div style={priceSectionStyle}>
+                            <h4 style={sectionTitleStyle}>Live Prices</h4>
+                            <div style={priceGridStyle}>
+                                <PriceField label="Buy" value={formatPriceFull(priceData.low)} />
+                                <PriceField label="Sell" value={formatPriceFull(priceData.high)} />
+                                <PriceField label="Margin" value={formatColoredNumber(priceData.margin)} />
+                                <PriceField label="ROI%" value={formatRoi(priceData.roi_percent)} />
+                                <PriceField label="Spread%" value={formatRoi(priceData.spread_percent)} />
+                                <PriceField label="Max Profit" value={formatColoredNumber(priceData.max_profit)} />
+                                <PriceField label="Max Investment" value={formatPriceFull(priceData.max_investment)} />
+                            </div>
+                            <div style={timestampGridStyle}>
+                                <PriceField label="High Timestamp" value={timeAgo(priceData.high_timestamp)} />
+                                <PriceField label="Low Timestamp" value={timeAgo(priceData.low_timestamp)} />
+                            </div>
+                        </div>
+                    ) : null}
+                    
                     {/* Metrics below */}
                     <div style={metricsSectionStyle}>
                         <h4 style={sectionTitleStyle}>Advanced Metrics</h4>
+                        <div style={granularitySelectorStyle}>
+                            {canonicalGranularityOptions.map((gran) => (
+                                <button
+                                    key={gran}
+                                    onClick={() => setSelectedCanonicalGranularity(gran)}
+                                    style={{
+                                        ...granularityButtonStyle,
+                                        background: gran === selectedCanonicalGranularity ? '#202737' : '#151a22',
+                                        color: gran === selectedCanonicalGranularity ? '#e6e9ef' : '#9aa4b2',
+                                        border: gran === selectedCanonicalGranularity ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.06)',
+                                    }}
+                                >
+                                    {gran}
+                                </button>
+                            ))}
+                        </div>
                         {advancedLoading ? (
                             <p style={loadingTextStyle}>Loading advanced metrics...</p>
                         ) : (
-                            <AdvancedMetrics trendDetails={trendDetails} />
+                            <AdvancedMetrics 
+                                canonicalData={canonicalData} 
+                                selectedGranularity={selectedCanonicalGranularity} 
+                            />
                         )}
                     </div>
                 </div>
@@ -217,7 +270,7 @@ export default function ExpandedRowContent({ item }) {
 
 const expandedCellStyle = {
     padding: 0,
-    backgroundColor: "#181e27",
+    backgroundColor: "#151a22",
     borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
 };
 
@@ -259,6 +312,28 @@ const tradesSectionStyle = {
     border: "1px solid rgba(255, 255, 255, 0.06)",
 };
 
+const priceSectionStyle = {
+    backgroundColor: "#151a22",
+    borderRadius: "8px",
+    padding: "16px",
+    border: "1px solid rgba(255, 255, 255, 0.06)",
+};
+
+const priceGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "12px",
+    marginBottom: "12px",
+};
+
+const timestampGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "12px",
+    paddingTop: "12px",
+    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+};
+
 const metricsSectionStyle = {
     backgroundColor: "#151a22",
     borderRadius: "8px",
@@ -273,6 +348,7 @@ const sectionTitleStyle = {
     color: "#e6e9ef",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const timeRangeButtonsStyle = {
@@ -289,6 +365,7 @@ const timeRangeButtonStyle = {
     fontWeight: 500,
     transition: "all 0.2s",
     border: "1px solid rgba(255,255,255,0.06)",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const chartLoadingStyle = {
@@ -307,6 +384,7 @@ const loadingTextStyle = {
     color: "#9aa4b2",
     fontSize: "14px",
     margin: 0,
+    fontFamily: "'Inter', sans-serif",
 };
 
 const emptyTextStyle = {
@@ -314,4 +392,53 @@ const emptyTextStyle = {
     fontSize: "12px",
     fontStyle: "italic",
     margin: 0,
+    fontFamily: "'Inter', sans-serif",
+};
+
+const granularitySelectorStyle = {
+    display: "flex",
+    gap: "6px",
+    marginBottom: "12px",
+    flexWrap: "wrap",
+};
+
+const granularityButtonStyle = {
+    padding: "4px 8px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: 500,
+    transition: "all 0.2s",
+    border: "1px solid rgba(255,255,255,0.06)",
+    fontFamily: "'Inter', sans-serif",
+};
+
+function PriceField({ label, value }) {
+    return (
+        <div style={priceFieldStyle}>
+            <div style={priceLabelStyle}>{label}</div>
+            <div style={priceValueStyle}>{value}</div>
+        </div>
+    );
+}
+
+const priceFieldStyle = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+};
+
+const priceLabelStyle = {
+    fontSize: "11px",
+    color: "#9aa4b2",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    fontFamily: "'Inter', sans-serif",
+};
+
+const priceValueStyle = {
+    fontSize: "14px",
+    fontWeight: 600,
+    color: "#e6e9ef",
+    fontFamily: "'Inter', sans-serif",
 };

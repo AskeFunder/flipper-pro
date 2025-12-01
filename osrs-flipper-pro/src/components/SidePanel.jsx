@@ -3,6 +3,7 @@ import {
     formatPriceFull,
     formatColoredNumber,
     formatRoi,
+    timeAgo,
 } from "../utils/formatting";
 import { apiFetch } from "../utils/api";
 import { useLivePrice } from "../hooks/useLivePrice";
@@ -47,6 +48,10 @@ export default function SidePanel({ item, onClose }) {
     
     // Chart state
     const [timeRange, setTimeRange] = useState('12H');
+    
+    // Canonical granularity selector (independent from chart granularity)
+    const [selectedCanonicalGranularity, setSelectedCanonicalGranularity] = useState('1h');
+    const canonicalGranularityOptions = ['5m', '1h', '6h', '24h', '7d', '1m'];
     
     // Use custom hooks for patch updates
     const { priceData, isInitialLoading: priceLoading } = useLivePrice(canonicalData);
@@ -210,23 +215,6 @@ export default function SidePanel({ item, onClose }) {
                     </div>
                 ) : (
                     <>
-                        {/* Live Price Block */}
-                        {priceLoading ? (
-                            <div style={sectionStyle}>
-                                <p style={loadingTextStyle}>Loading prices...</p>
-                            </div>
-                        ) : priceData ? (
-                            <div style={sectionStyle}>
-                                <h4 style={sectionTitleStyle}>Live Prices</h4>
-                                <div style={priceGridStyle}>
-                                    <PriceField label="Buy" value={formatPriceFull(priceData.low)} />
-                                    <PriceField label="Sell" value={formatPriceFull(priceData.high)} />
-                                    <PriceField label="Margin" value={formatColoredNumber(priceData.margin)} />
-                                    <PriceField label="ROI%" value={formatRoi(priceData.roi_percent)} />
-                                </div>
-                            </div>
-                        ) : null}
-                        
                         {/* Chart */}
                         <div style={sectionStyle}>
                             <h4 style={sectionTitleStyle}>Price Chart</h4>
@@ -255,6 +243,30 @@ export default function SidePanel({ item, onClose }) {
                             )}
                         </div>
                         
+                        {/* Live Price Block */}
+                        {priceLoading ? (
+                            <div style={sectionStyle}>
+                                <p style={loadingTextStyle}>Loading prices...</p>
+                            </div>
+                        ) : priceData ? (
+                            <div style={sectionStyle}>
+                                <h4 style={sectionTitleStyle}>Live Prices</h4>
+                                <div style={priceGridStyle}>
+                                    <PriceField label="Buy" value={formatPriceFull(priceData.low)} />
+                                    <PriceField label="Sell" value={formatPriceFull(priceData.high)} />
+                                    <PriceField label="Margin" value={formatColoredNumber(priceData.margin)} />
+                                    <PriceField label="ROI%" value={formatRoi(priceData.roi_percent)} />
+                                    <PriceField label="Spread%" value={formatRoi(priceData.spread_percent)} />
+                                    <PriceField label="Max Profit" value={formatColoredNumber(priceData.max_profit)} />
+                                    <PriceField label="Max Investment" value={formatPriceFull(priceData.max_investment)} />
+                                </div>
+                                <div style={timestampGridStyle}>
+                                    <PriceField label="High Timestamp" value={timeAgo(priceData.high_timestamp)} />
+                                    <PriceField label="Low Timestamp" value={timeAgo(priceData.low_timestamp)} />
+                                </div>
+                            </div>
+                        ) : null}
+                        
                         {/* Recent Trades */}
                         <div style={sectionStyle}>
                             <h4 style={sectionTitleStyle}>Recent Trades</h4>
@@ -273,7 +285,26 @@ export default function SidePanel({ item, onClose }) {
                         ) : (
                             <div style={sectionStyle}>
                                 <h4 style={sectionTitleStyle}>Advanced Metrics</h4>
-                                <AdvancedMetrics trendDetails={trendDetails} />
+                                <div style={granularitySelectorStyle}>
+                                    {canonicalGranularityOptions.map((gran) => (
+                                        <button
+                                            key={gran}
+                                            onClick={() => setSelectedCanonicalGranularity(gran)}
+                                            style={{
+                                                ...granularityButtonStyle,
+                                                background: gran === selectedCanonicalGranularity ? '#202737' : '#151a22',
+                                                color: gran === selectedCanonicalGranularity ? '#e6e9ef' : '#9aa4b2',
+                                                border: gran === selectedCanonicalGranularity ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.06)',
+                                            }}
+                                        >
+                                            {gran}
+                                        </button>
+                                    ))}
+                                </div>
+                                <AdvancedMetrics 
+                                    canonicalData={canonicalData} 
+                                    selectedGranularity={selectedCanonicalGranularity} 
+                                />
                             </div>
                         )}
                     </>
@@ -331,6 +362,7 @@ const titleStyle = {
     fontSize: "18px",
     fontWeight: 600,
     color: "#e6e9ef",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const headerMetaStyle = {
@@ -339,6 +371,7 @@ const headerMetaStyle = {
     fontSize: "12px",
     color: "#9aa4b2",
     marginTop: "4px",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const closeButtonStyle = {
@@ -366,7 +399,7 @@ const contentStyle = {
 };
 
 const sectionStyle = {
-    backgroundColor: "#181e27",
+    backgroundColor: "#151a22",
     borderRadius: "8px",
     padding: "16px",
     border: "1px solid rgba(255, 255, 255, 0.06)",
@@ -379,12 +412,22 @@ const sectionTitleStyle = {
     color: "#e6e9ef",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const priceGridStyle = {
     display: "grid",
     gridTemplateColumns: "repeat(2, 1fr)",
     gap: "12px",
+    marginBottom: "12px",
+};
+
+const timestampGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "12px",
+    paddingTop: "12px",
+    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
 };
 
 const priceFieldStyle = {
@@ -401,9 +444,10 @@ const priceLabelStyle = {
 };
 
 const priceValueStyle = {
-    fontSize: "16px",
+    fontSize: "14px",
     fontWeight: 600,
     color: "#e6e9ef",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const timeRangeButtonsStyle = {
@@ -421,6 +465,7 @@ const timeRangeButtonStyle = {
     fontWeight: 500,
     transition: "all 0.2s",
     border: "1px solid rgba(255,255,255,0.06)",
+    fontFamily: "'Inter', sans-serif",
 };
 
 const chartLoadingStyle = {
@@ -439,6 +484,7 @@ const loadingTextStyle = {
     color: "#9aa4b2",
     fontSize: "14px",
     margin: 0,
+    fontFamily: "'Inter', sans-serif",
 };
 
 const emptyTextStyle = {
@@ -446,4 +492,23 @@ const emptyTextStyle = {
     fontSize: "12px",
     fontStyle: "italic",
     margin: 0,
+    fontFamily: "'Inter', sans-serif",
+};
+
+const granularitySelectorStyle = {
+    display: "flex",
+    gap: "6px",
+    marginBottom: "12px",
+    flexWrap: "wrap",
+};
+
+const granularityButtonStyle = {
+    padding: "4px 8px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: 500,
+    transition: "all 0.2s",
+    border: "1px solid rgba(255,255,255,0.06)",
+    fontFamily: "'Inter', sans-serif",
 };
