@@ -10,9 +10,9 @@
 
 .shimmer {
     background: linear-gradient(90deg,
-            #f3f4f6 25%,
-            #e5e7eb 50%,
-            #f3f4f6 75%);
+            #151a22 25%,
+            #202737 50%,
+            #151a22 75%);
     background-size: 1000px 100%;
     animation: shimmer 1.5s linear infinite;
     animation-delay: -0.75s;
@@ -22,12 +22,18 @@
 }
 
 .shimmer-icon {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     margin: auto;
 }
 
 .shimmer-cell {
-    height: 20px;
+    height: 14px;
+    margin: auto;
+}
+
+.shimmer-sparkline {
+    width: 80px;
+    height: 24px;
     margin: auto;
 }

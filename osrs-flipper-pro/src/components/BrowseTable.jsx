@@ -1,16 +1,7 @@
 import React from "react";
-import {
-    formatCompact,
-    formatPriceFull,
-    formatColoredNumber,
-    formatRoi,
-    timeAgo,
-    nameToSlug,
-} from "../utils/formatting";
+import BrowseTableRow from "./BrowseTableRow";
 
-const baseIconURL = "https://oldschool.runescape.wiki/images/thumb";
-
-export default function BrowseTable({ items, visibleColumns, loading, sortBy, order, onSort, onItemClick }) {
+export default function BrowseTable({ items, visibleColumns, loading, error, sortBy, order, onSort, onItemClick }) {
     const shimmerColCount = 10;
 
     if (loading) {
@@ -20,6 +11,7 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                 <thead>
                     <tr style={headerRowStyle}>
                         <th style={thStyle}>Item</th>
+                        <th style={thStyle}>7d</th>
                         {Array.from({ length: shimmerColCount }).map((_, i) => (
                             <th key={i} style={thStyle}>&nbsp;</th>
                         ))}
@@ -30,6 +22,9 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                         <tr key={i} style={rowStyle}>
                             <td style={tdStyle}>
                                 <div className="shimmer shimmer-icon" />
+                            </td>
+                            <td style={tdStyle}>
+                                <div className="shimmer shimmer-sparkline" />
                             </td>
                             {Array.from({ length: shimmerColCount }).map((_, j) => (
                                 <td key={j} style={{ ...tdStyle, textAlign: "right" }}>
@@ -44,13 +39,14 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
         );
     }
 
-    if (!items.length) {
+    if (!items.length && !loading) {
         return (
             <div style={scrollContainerStyle}>
             <table style={tableStyle}>
                 <thead>
                     <tr style={headerRowStyle}>
                         <th style={thStyle}>Item</th>
+                        <th style={thStyle}>7d</th>
                         {visibleColumns.map((col) => (
                             <th key={col.id} style={thStyle}>{col.label}</th>
                         ))}
@@ -58,7 +54,26 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
                 </thead>
                 <tbody>
                     <tr>
-                        <td colSpan={visibleColumns.length + 1} style={tdStyle}>No items found.</td>
+                        <td colSpan={visibleColumns.length + 2} style={errorStyle}>
+                            {error ? (
+                                <div style={errorContainerStyle}>
+                                    <div style={errorIconStyle}>⚠️</div>
+                                    <div>
+                                        <div style={errorTitleStyle}>
+                                            {error.type === 'rate_limit' ? 'Too Many Requests' : 'Error Loading Items'}
+                                        </div>
+                                        <div style={errorMessageStyle}>{error.message}</div>
+                                        {error.type === 'rate_limit' && (
+                                            <div style={errorHintStyle}>
+                                                Please wait a few seconds before refreshing.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                'No items found.'
+                            )}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -71,140 +86,42 @@ export default function BrowseTable({ items, visibleColumns, loading, sortBy, or
         <table style={tableStyle}>
             <thead>
                 <tr style={headerRowStyle}>
-                        <th style={thStyleLeft}>Item</th>
+                    <th style={thStyleLeft}>Item</th>
+                    <th style={thStyle}>7d</th>
                     {visibleColumns.map((col) => {
                         const isSorted =
                             (col.id === "buy_price" && sortBy === "buy_time") ||
                             (col.id === "sell_price" && sortBy === "sell_time") ||
                             sortBy === col.id;
                         return (
-                                <th 
-                                    key={col.id} 
-                                    style={thStyle} 
-                                    onClick={() => onSort(col.id)}
-                                    className="table-header"
-                                >
-                                    <span style={headerContentStyle}>
-                                        {col.label}
-                                        {isSorted && (
-                                            <span style={sortIndicatorStyle}>
-                                                {order === "asc" ? " ▲" : " ▼"}
-                                            </span>
-                                        )}
-                                    </span>
+                            <th 
+                                key={col.id} 
+                                style={thStyle} 
+                                onClick={() => onSort(col.id)}
+                                className="table-header"
+                            >
+                                <span style={headerContentStyle}>
+                                    {col.label}
+                                    {isSorted && (
+                                        <span style={sortIndicatorStyle}>
+                                            {order === "asc" ? " ▲" : " ▼"}
+                                        </span>
+                                    )}
+                                </span>
                             </th>
                         );
                     })}
                 </tr>
             </thead>
             <tbody>
-                {items.map((item) => {
-                    const icon = item.icon || `${item.name}.png`;
-                    const safe = encodeURIComponent(icon.replace(/ /g, "_"));
-                    const slug = nameToSlug(item.name);
-                    const itemUrl = `/item/${item.id}-${encodeURIComponent(slug)}`;
-                    
-                    const handleRowClick = (e) => {
-                        // Don't navigate if clicking on a link (let browser handle it)
-                        if (e.target.tagName === "A" || e.target.closest("a")) {
-                            return;
-                        }
-                        // For normal clicks on the row, do SPA navigation
-                        if (onItemClick) {
-                            onItemClick(item.id, item.name);
-                        }
-                    };
-                    
-                    const handleLinkClick = (e) => {
-                        // If it's a normal click (not Ctrl/Cmd/Middle), do SPA navigation
-                        if (!e.ctrlKey && !e.metaKey && e.button === 0) {
-                            e.preventDefault();
-                            if (onItemClick) {
-                                onItemClick(item.id, item.name);
-                            }
-                        }
-                        // Otherwise, let browser handle it (Ctrl/Cmd/Middle-click for new tab)
-                    };
-                    
-                    return (
-                            <tr 
-                                key={item.id} 
-                                style={rowStyle}
-                                onClick={handleRowClick}
-                                className="browse-table-row"
-                            >
-                            <td style={tdStyle}>
-                                <a
-                                    href={itemUrl}
-                                    onClick={handleLinkClick}
-                                    className="browse-item-link"
-                                    style={{
-                                        color: "inherit",
-                                        textDecoration: "none",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 12,
-                                    }}
-                                >
-                                    <img
-                                        src={`${baseIconURL}/${safe}/32px-${safe}`}
-                                        alt={item.name}
-                                        width={32}
-                                        height={32}
-                                        style={iconStyle}
-                                        onError={(e) => (e.currentTarget.style.display = "none")}
-                                    />
-                                    <span>{item.name}</span>
-                                </a>
-                            </td>
-                            {visibleColumns.map((col) => {
-                                const value = item[col.id];
-                                let display;
-                                let style = { ...tdStyle, textAlign: "right" };
-
-                                if (col.id === "buy_price") {
-                                    display = (
-                                        <>
-                                            <div>{formatPriceFull(item.buy_price)}</div>
-                                            <div style={timeStyle}>{timeAgo(item.buy_time)}</div>
-                                        </>
-                                    );
-                                } else if (col.id === "sell_price") {
-                                    display = (
-                                        <>
-                                            <div>{formatPriceFull(item.sell_price)}</div>
-                                            <div style={timeStyle}>{timeAgo(item.sell_time)}</div>
-                                        </>
-                                    );
-                                } else if (col.id.startsWith("buy_sell_rate_")) {
-                                    if (value == null) {
-                                        display = "–";
-                                    } else {
-                                        const num = parseFloat(value);
-                                        if (isNaN(num)) {
-                                            display = "–";
-                                        } else {
-                                            display = num.toFixed(2);
-                                            style.color = num < 1 ? "red" : "green";
-                                        }
-                                    }
-                                } else if (col.id === "roi" || col.id.startsWith("trend_")) {
-                                    display = formatRoi(value);
-                                } else if (col.id === "margin" || col.id === "max_profit") {
-                                    display = formatColoredNumber(value);
-                                } else {
-                                    display = formatCompact(value);
-                                }
-
-                                return (
-                                    <td key={col.id} style={style}>
-                                        {display}
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                    );
-                })}
+                {items.map((item) => (
+                    <BrowseTableRow
+                        key={item.id}
+                        item={item}
+                        visibleColumns={visibleColumns}
+                        onItemClick={onItemClick}
+                    />
+                ))}
             </tbody>
         </table>
         </div>
@@ -231,22 +148,23 @@ const tableStyle = {
 };
 
 const headerRowStyle = {
-    background: "#f9fafb",
-    borderBottom: "2px solid #e5e7eb",
+    background: "#151a22", /* Table surface */
+    borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
 };
 
 const rowStyle = {
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
     cursor: "pointer",
     transition: "background-color 0.2s",
+    backgroundColor: "#181e27", /* Row background */
 };
 
 const thStyle = {
-    padding: "12px 16px",
-    fontSize: 14,
+    padding: "10px 12px",
+    fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
-    color: "#374151",
+    color: "#9aa4b2", /* Secondary text */
     textAlign: "right",
     userSelect: "none",
     transition: "background-color 0.2s",
@@ -265,23 +183,63 @@ const headerContentStyle = {
 
 const sortIndicatorStyle = {
     fontSize: 12,
-    color: "#1e1e1e",
+    color: "#9aa4b2",
     fontWeight: "bold",
 };
 
 const tdStyle = {
-    padding: "14px 16px",
-    fontSize: 16,
+    padding: "10px 12px",
+    fontSize: 13,
     verticalAlign: "middle",
     whiteSpace: "nowrap",
+    color: "#e6e9ef", /* Primary text */
 };
 
 const timeStyle = {
-    fontSize: 12,
-    color: "#6b7280",
+    fontSize: 11,
+    color: "#9aa4b2", /* Secondary text */
 };
 
 const iconStyle = {
     borderRadius: 4,
     objectFit: "contain",
+};
+
+const errorStyle = {
+    ...tdStyle,
+    textAlign: "center",
+    padding: "40px 20px",
+};
+
+const errorContainerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    flexDirection: "column",
+};
+
+const errorIconStyle = {
+    fontSize: "48px",
+    lineHeight: 1,
+};
+
+const errorTitleStyle = {
+    fontSize: "16px",
+    fontWeight: 600,
+    color: "#ff5c5c", /* Red for errors */
+    marginBottom: "8px",
+};
+
+const errorMessageStyle = {
+    fontSize: "14px",
+    color: "#9aa4b2", /* Secondary text */
+    marginBottom: "4px",
+};
+
+const errorHintStyle = {
+    fontSize: "12px",
+    color: "#9aa4b2", /* Secondary text */
+    fontStyle: "italic",
+    marginTop: "8px",
 };

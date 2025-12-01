@@ -61,9 +61,43 @@ ChartJS.register({
         ctx.moveTo(x, topY);
         ctx.lineTo(x, bottomY);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.setLineDash([5, 5]);
         ctx.stroke();
+        ctx.restore();
+    }
+});
+
+// Register custom plugin to draw vertical grid lines only at tick positions
+ChartJS.register({
+    id: 'tickGridLines',
+    afterDraw: (chart) => {
+        const ctx = chart.ctx;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        
+        if (!xScale || !yScale || !chart.chartArea) return;
+        
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        
+        // Get all tick positions from the scale
+        const ticks = xScale.ticks;
+        if (ticks && ticks.length > 0) {
+            ticks.forEach((tick) => {
+                const x = xScale.getPixelForValue(tick.value);
+                // Only draw if within chart area
+                if (x >= chart.chartArea.left && x <= chart.chartArea.right) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, chart.chartArea.top);
+                    ctx.lineTo(x, chart.chartArea.bottom);
+                    ctx.stroke();
+                }
+            });
+        }
+        
         ctx.restore();
     }
 });
@@ -327,6 +361,7 @@ export default function ItemDetailPage() {
     const chartRef = useRef(null);
 
     // Fetch canonical data first to get item_id and limit
+    // Note: Canonical data rarely changes, so we only fetch once on mount/param change
     useEffect(() => {
         if (!numericItemId && !itemNameSlug) return;
 
@@ -360,9 +395,7 @@ export default function ItemDetailPage() {
         };
 
         fetchCanonical();
-        // Update canonical data every 15 seconds (same as other live data)
-        const interval = setInterval(fetchCanonical, 15000);
-        return () => clearInterval(interval);
+        // Canonical data rarely changes, so we don't poll it
     }, [numericItemId, itemNameSlug]);
 
     // Fetch basic (live) data from /api/prices/latest/:id
@@ -423,10 +456,14 @@ export default function ItemDetailPage() {
             }
         };
 
-        fetchBasic();
+        // Stagger initial fetch slightly to avoid simultaneous requests
+        const initialTimeout = setTimeout(fetchBasic, 50);
         // Update every 15 seconds
         const interval = setInterval(fetchBasic, 15000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(interval);
+        };
     }, [canonicalData]);
 
     // Fetch chart data
@@ -442,9 +479,13 @@ export default function ItemDetailPage() {
                 .catch(console.error);
         };
 
-        fetchChart();
+        // Stagger initial fetch slightly to avoid simultaneous requests
+        const initialTimeout = setTimeout(fetchChart, 100);
         const int = setInterval(fetchChart, 15000);
-        return () => clearInterval(int);
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(int);
+        };
     }, [canonicalData, timeRange]);
 
     // Fetch recent trades
@@ -457,9 +498,13 @@ export default function ItemDetailPage() {
                 .catch(console.error);
         };
 
-        fetchRecent();
+        // Stagger initial fetch slightly to avoid simultaneous requests
+        const initialTimeout = setTimeout(fetchRecent, 150);
         const int = setInterval(fetchRecent, 15000);
-        return () => clearInterval(int);
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(int);
+        };
     }, [canonicalData]);
     
     // Set up zoom callback - use global callback that plugin can access
@@ -1100,6 +1145,7 @@ export default function ItemDetailPage() {
                 distribution: 'series',
                 ticks: {
                     padding: 0,
+                    color: '#9aa4b2', // Secondary text color for dark mode
                     // For 4H time range, generate ticks at whole and half hours
                     ...(timeRange === '4H' ? {
                         source: 'data',
@@ -1445,6 +1491,10 @@ export default function ItemDetailPage() {
                         axis.ticks = ticks;
                     }
                 } : {}),
+                grid: {
+                    display: false, // Disable default grid lines - we'll draw custom ones at tick positions
+                    drawBorder: false,
+                }
             },
             y: { 
                 title: { display: false },
@@ -1452,6 +1502,7 @@ export default function ItemDetailPage() {
                 max: yMax,
                 ticks: {
                     stepSize: wholeNumberStep,
+                    color: '#9aa4b2', // Secondary text color for dark mode
                     callback: function(value) {
                         // Only show ticks at whole numbers, hide decimals
                         if (value % 1 !== 0) {
@@ -1468,13 +1519,72 @@ export default function ItemDetailPage() {
                         }
                         return rounded.toLocaleString();
                     }
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.06)', // Borders color for dark mode
+                }
+            }
+        },
+        plugins: {
+            tooltip: {
+                filter: function(tooltipItem) {
+                    // Don't show tooltip if currently dragging
+                    if (globalDragState.isDragging) return false;
+                    
+                    // Only show tooltips for items that have valid data
+                    const parsedY = tooltipItem.parsed.y;
+                    if (parsedY == null || isNaN(parsedY)) return false;
+                    
+                    // For Volume dataset, also check rawVolume
+                    if (tooltipItem.dataset.label === 'Volume') {
+                        const rawVolume = tooltipItem.raw?.rawVolume;
+                        return rawVolume != null && rawVolume > 0;
+                    }
+                    
+                    return true;
+                },
+                callbacks: {
+                    title: items => {
+                        const validItem = items.find(item => item.parsed && item.parsed.x != null);
+                        if (!validItem) return '';
+                        return new Date(validItem.parsed.x).toLocaleString();
+                    },
+                    label: function(context) {
+                        const dataset = context.dataset;
+                        const parsedY = context.parsed.y;
+                        
+                        // Safety check - should be filtered by filter callback, but just in case
+                        if (parsedY == null || isNaN(parsedY)) return null;
+                        
+                        if (dataset.label === 'Volume') {
+                            const rawVolume = context.raw?.rawVolume;
+                            if (rawVolume && rawVolume > 0) {
+                                // Show actual volume value
+                                if (rawVolume >= 1000000) return `Volume: ${(rawVolume / 1000000).toFixed(1)}M`;
+                                if (rawVolume >= 1000) return `Volume: ${(rawVolume / 1000).toFixed(1)}K`;
+                                return `Volume: ${rawVolume.toLocaleString()}`;
+                            }
+                            return null;
+                        }
+                        return `${dataset.label}: ${parsedY.toLocaleString()} gp`;
+                    }
+                },
+                backgroundColor: '#151a22', // Table surface for dark mode
+                titleColor: '#e6e9ef', // Primary text color
+                bodyColor: '#e6e9ef', // Primary text color
+                borderColor: 'rgba(255, 255, 255, 0.06)', // Borders color
+                borderWidth: 1,
+            },
+            legend: {
+                labels: {
+                    color: '#e6e9ef', // Primary text color for dark mode
                 }
             }
         }
     };
 
     return (
-        <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif" }}>
+        <div style={{ padding: "2rem", fontFamily: "'Inter',sans-serif", backgroundColor: "#0f1115", minHeight: "100vh", color: "#e6e9ef" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "32px" }}>
                 <img
@@ -1486,9 +1596,9 @@ export default function ItemDetailPage() {
                     onError={(e) => (e.currentTarget.style.display = "none")}
                 />
                 <div style={{ flex: 1 }}>
-                    <h1 style={{ margin: 0, fontSize: "32px" }}>{canonicalData.name}</h1>
+                    <h1 style={{ margin: 0, fontSize: "32px", color: "#e6e9ef" }}>{canonicalData.name}</h1>
                     {basicData && basicData.high && basicData.low && (
-                        <p style={{ margin: "8px 0 0 0", fontSize: "18px", color: "#374151" }}>
+                        <p style={{ margin: "8px 0 0 0", fontSize: "18px", color: "#9aa4b2" }}>
                             Buy: {formatPriceFull(basicData.low)} gp | Sell: {formatPriceFull(basicData.high)} gp
                         </p>
                     )}
@@ -1511,11 +1621,22 @@ export default function ItemDetailPage() {
                                     style={{
                                         marginRight: 6,
                                         padding: '6px 10px',
-                                        background: label === timeRange ? '#1e1e1e' : '#f0f0f0',
-                                        color: label === timeRange ? '#fff' : '#000',
+                                        background: label === timeRange ? '#202737' : '#151a22',
+                                        color: label === timeRange ? '#e6e9ef' : '#9aa4b2',
                                         borderRadius: 4,
-                                        border: label === timeRange ? '2px solid #444' : '1px solid #ccc',
-                                        cursor: 'pointer'
+                                        border: label === timeRange ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.06)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (label !== timeRange) {
+                                            e.target.style.background = '#202737';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (label !== timeRange) {
+                                            e.target.style.background = '#151a22';
+                                        }
                                     }}
                                 >
                                     {label}
@@ -1530,14 +1651,14 @@ export default function ItemDetailPage() {
                                 display: 'flex', 
                                 alignItems: 'center', 
                                 justifyContent: 'center',
-                                color: '#6b7280',
+                                color: '#9aa4b2',
                                 fontSize: '16px',
                                 fontStyle: 'italic'
                             }}>
                                 No price data available in selected range.
                             </div>
                         ) : (
-                            <div style={{ height: '60vh', position: 'relative' }}>
+                            <div style={{ height: '60vh', position: 'relative', backgroundColor: '#151a22', borderRadius: '8px', padding: '16px' }}>
                                 {/* Reset Zoom Button and Zoom Trend */}
                                 {zoomBounds.min && zoomBounds.max && (
                                     <div
@@ -1550,10 +1671,11 @@ export default function ItemDetailPage() {
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: '12px',
-                                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                            backgroundColor: '#181e27',
                                             padding: '8px 16px',
                                             borderRadius: '8px',
-                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+                                            border: '1px solid rgba(255,255,255,0.06)',
                                         }}
                                     >
                                         {zoomTrend !== null && (
@@ -1561,7 +1683,7 @@ export default function ItemDetailPage() {
                                                 style={{
                                                     fontSize: '0.875rem',
                                                     fontWeight: '600',
-                                                    color: zoomTrend >= 0 ? '#10b981' : '#ef4444',
+                                                    color: zoomTrend >= 0 ? '#2bd97f' : '#ff5c5c',
                                                 }}
                                                 title={`Trend for zoomed area: ${zoomTrend >= 0 ? '+' : ''}${zoomTrend.toFixed(2)}%`}
                                             >
@@ -1574,19 +1696,20 @@ export default function ItemDetailPage() {
                                             }}
                                             style={{
                                                 padding: '6px 12px',
-                                                backgroundColor: '#3b82f6',
-                                                color: 'white',
-                                                border: 'none',
+                                                backgroundColor: '#202737',
+                                                color: '#e6e9ef',
+                                                border: '1px solid rgba(255,255,255,0.06)',
                                                 borderRadius: '4px',
                                                 cursor: 'pointer',
                                                 fontSize: '0.875rem',
                                                 fontWeight: '500',
+                                                transition: 'all 0.2s',
                                             }}
                                             onMouseEnter={(e) => {
-                                                e.target.style.backgroundColor = '#2563eb';
+                                                e.target.style.backgroundColor = '#2a3245';
                                             }}
                                             onMouseLeave={(e) => {
-                                                e.target.style.backgroundColor = '#3b82f6';
+                                                e.target.style.backgroundColor = '#202737';
                                             }}
                                         >
                                             Reset Zoom
@@ -1609,16 +1732,16 @@ export default function ItemDetailPage() {
                         <div style={{ maxHeight: '60vh', overflowY: 'auto', overflowX: 'hidden' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)' }}>
                                 <thead>
-                                    <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "35%" }}>Time</th>
-                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "15%" }}>Type</th>
-                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "50%" }}>Price</th>
+                                    <tr style={{ background: "#181e27", borderBottom: "2px solid rgba(255,255,255,0.06)" }}>
+                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "35%", color: "#e6e9ef" }}>Time</th>
+                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "15%", color: "#e6e9ef" }}>Type</th>
+                                        <th align="left" style={{ padding: "8px 6px", textAlign: "left", whiteSpace: "nowrap", width: "50%", color: "#e6e9ef" }}>Price</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {recentTrades.length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#6b7280" }}>
+                                            <td colSpan={3} style={{ padding: "20px", textAlign: "center", color: "#9aa4b2" }}>
                                                 No recent trades available
                                             </td>
                                         </tr>
@@ -1629,8 +1752,8 @@ export default function ItemDetailPage() {
                                             // So invert the logic
                                             const isBuy = t.type === 'sell';
                                             const label = isBuy ? 'BUY' : 'SELL';
-                                            const rowColor = isBuy ? '#eaffea' : '#ffeaea';
-                                            const textColor = isBuy ? '#007a00' : '#b20000';
+                                            const rowColor = isBuy ? 'rgba(43, 217, 127, 0.1)' : 'rgba(255, 92, 92, 0.1)';
+                                            const textColor = isBuy ? '#2bd97f' : '#ff5c5c';
                                             return (
                                                 <tr key={i} style={{ backgroundColor: rowColor, color: textColor }}>
                                                     <td style={{ padding: "8px 6px", whiteSpace: "nowrap" }}>{timeAgo(t.ts)}</td>
@@ -1670,7 +1793,7 @@ export default function ItemDetailPage() {
                         </div>
                     </>
                 ) : (
-                    <p>No live market data available</p>
+                    <p style={{ color: '#9aa4b2' }}>No live market data available</p>
                 )}
             </div>
 
@@ -1686,12 +1809,23 @@ export default function ItemDetailPage() {
                             onClick={() => setSelectedGranularity(gran)}
                             style={{
                                 padding: '8px 16px',
-                                background: gran === selectedGranularity ? '#1e1e1e' : '#f0f0f0',
-                                color: gran === selectedGranularity ? '#fff' : '#000',
+                                background: gran === selectedGranularity ? '#202737' : '#151a22',
+                                color: gran === selectedGranularity ? '#e6e9ef' : '#9aa4b2',
                                 borderRadius: 4,
-                                border: gran === selectedGranularity ? '2px solid #444' : '1px solid #ccc',
+                                border: gran === selectedGranularity ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.06)',
                                 cursor: 'pointer',
                                 fontWeight: gran === selectedGranularity ? 600 : 400,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                if (gran !== selectedGranularity) {
+                                    e.target.style.background = '#202737';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (gran !== selectedGranularity) {
+                                    e.target.style.background = '#151a22';
+                                }
                             }}
                         >
                             {gran}
@@ -1720,7 +1854,7 @@ export default function ItemDetailPage() {
                             label={`Buy/Sell Rate (${selectedGranularity})`} 
                             value={
                                 <span style={{ 
-                                    color: granularityMetrics.buy_sell_rate < 1 ? "#dc2626" : "#16a34a",
+                                    color: granularityMetrics.buy_sell_rate < 1 ? "#ff5c5c" : "#2bd97f",
                                     fontFamily: "monospace"
                                 }}>
                                     {parseFloat(granularityMetrics.buy_sell_rate).toFixed(2)}
@@ -1821,8 +1955,8 @@ function TrendField({ label, value, itemId, granularity }) {
                         left: '50%',
                         transform: 'translateX(-50%)',
                         marginBottom: '8px',
-                        backgroundColor: '#1f2937',
-                        color: '#fff',
+                        backgroundColor: '#151a22', // Table surface
+                        color: '#e6e9ef', // Primary text
                         padding: '12px 16px',
                         borderRadius: '8px',
                         fontSize: '12px',
@@ -1831,20 +1965,21 @@ function TrendField({ label, value, itemId, granularity }) {
                         zIndex: 1000,
                         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
                         pointerEvents: 'none',
+                        border: '1px solid rgba(255,255,255,0.06)', // Borders
                     }}
                 >
                     {loading ? (
                         <div>Loading calculation details...</div>
                     ) : tooltipData ? (
                         <div>
-                            <div style={{ fontWeight: 600, marginBottom: '8px', borderBottom: '1px solid #374151', paddingBottom: '4px' }}>
+                            <div style={{ fontWeight: 600, marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '4px' }}>
                                 Trend Calculation
                             </div>
                             {tooltipData.current && tooltipData.previous ? (
                                 <>
                                     <div style={{ marginBottom: '8px' }}>
                                         <div style={{ fontWeight: 500, marginBottom: '4px' }}>Current Price:</div>
-                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#d1d5db' }}>
+                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#9aa4b2' }}>
                                             Mid: {formatPrice(tooltipData.current.mid)} gp
                                             {tooltipData.current.avg_high && tooltipData.current.avg_low && (
                                                 <span> (High: {formatPrice(tooltipData.current.avg_high)}, Low: {formatPrice(tooltipData.current.avg_low)})</span>
@@ -1857,7 +1992,7 @@ function TrendField({ label, value, itemId, granularity }) {
                                     </div>
                                     <div style={{ marginBottom: '8px' }}>
                                         <div style={{ fontWeight: 500, marginBottom: '4px' }}>Previous Price:</div>
-                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#d1d5db' }}>
+                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#9aa4b2' }}>
                                             Mid: {formatPrice(tooltipData.previous.mid)} gp
                                             {tooltipData.previous.avg_high && tooltipData.previous.avg_low && (
                                                 <span> (High: {formatPrice(tooltipData.previous.avg_high)}, Low: {formatPrice(tooltipData.previous.avg_low)})</span>
@@ -1868,9 +2003,9 @@ function TrendField({ label, value, itemId, granularity }) {
                                             Source: {tooltipData.previous.table}
                                         </div>
                                     </div>
-                                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #374151' }}>
+                                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                                         <div style={{ fontWeight: 500, marginBottom: '4px' }}>Calculation:</div>
-                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#d1d5db', fontFamily: 'monospace' }}>
+                                        <div style={{ marginLeft: '8px', fontSize: '11px', color: '#9aa4b2', fontFamily: 'monospace' }}>
                                             (({formatPrice(tooltipData.current.mid)} - {formatPrice(tooltipData.previous.mid)}) / {formatPrice(tooltipData.previous.mid)}) × 100
                                             <br />
                                             = {(() => {
@@ -1886,7 +2021,7 @@ function TrendField({ label, value, itemId, granularity }) {
                                     </div>
                                 </>
                             ) : (
-                                <div style={{ color: '#9ca3af' }}>
+                                <div style={{ color: '#9aa4b2' }}>
                                     Insufficient data to calculate trend
                                 </div>
                             )}
@@ -1902,20 +2037,20 @@ function TrendField({ label, value, itemId, granularity }) {
 
 // Styles
 const sectionContainerStyle = {
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
+    background: "#151a22", // Table surface
+    border: "1px solid rgba(255,255,255,0.06)", // Borders
     borderRadius: "8px",
     padding: "24px",
     marginBottom: "32px",
-    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.3)",
 };
 
 const sectionTitleStyle = {
     margin: "0 0 24px 0",
     fontSize: "24px",
     fontWeight: 600,
-    color: "#111827",
-    borderBottom: "2px solid #e5e7eb",
+    color: "#e6e9ef", // Primary text
+    borderBottom: "2px solid rgba(255,255,255,0.06)", // Borders
     paddingBottom: "12px",
 };
 
@@ -1935,7 +2070,7 @@ const fieldStyle = {
 const labelStyle = {
     fontSize: "12px",
     fontWeight: 500,
-    color: "#6b7280",
+    color: "#9aa4b2", // Secondary text
     textTransform: "uppercase",
     letterSpacing: "0.5px",
 };
@@ -1943,5 +2078,5 @@ const labelStyle = {
 const valueStyle = {
     fontSize: "16px",
     fontWeight: 500,
-    color: "#111827",
+    color: "#e6e9ef", // Primary text
 };

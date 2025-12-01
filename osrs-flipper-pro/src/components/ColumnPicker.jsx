@@ -4,10 +4,10 @@ import { allColumns } from "../constants/column";
 import "../styles/browse.css";
 
 const pickerContainerStyle = {
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
+    background: "#151a22", /* Table surface */
+    border: "1px solid rgba(255, 255, 255, 0.06)",
     borderRadius: "8px",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)",
     marginBottom: "24px",
     width: "100%",
 };
@@ -17,22 +17,22 @@ const pickerHeaderStyle = {
     justifyContent: "space-between",
     alignItems: "center",
     padding: "12px 16px",
-    borderBottom: "1px solid #e5e7eb",
-    background: "#f9fafb",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+    background: "#181e27", /* Row background */
 };
 
 const pickerTitleStyle = {
     margin: 0,
     fontSize: "18px",
     fontWeight: 600,
-    color: "#111827",
+    color: "#e6e9ef", /* Primary text */
 };
 
 const closeButtonStyle = {
     background: "none",
     border: "none",
     fontSize: "24px",
-    color: "#6b7280",
+    color: "#9aa4b2", /* Secondary text */
     cursor: "pointer",
     padding: "0",
     width: "28px",
@@ -71,7 +71,7 @@ const categoryHeaderStyle = {
 const categoryNameStyle = {
     fontWeight: 600,
     fontSize: "14px",
-    color: "#374151",
+    color: "#9aa4b2", /* Secondary text */
     textTransform: "uppercase",
     letterSpacing: "0.5px",
 };
@@ -109,18 +109,17 @@ const checkboxInputStyle = {
     width: "18px",
     height: "18px",
     cursor: "pointer",
-    accentColor: "#1e1e1e",
 };
 
 const checkboxTextStyle = {
     fontSize: "14px",
-    color: "#374151",
+    color: "#e6e9ef", /* Primary text */
 };
 
 const pickerFooterStyle = {
     padding: "12px 16px",
-    borderTop: "1px solid #e5e7eb",
-    background: "#f9fafb",
+    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+    background: "#181e27", /* Row background */
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -132,7 +131,7 @@ const doneButtonStyle = {
     fontSize: "14px",
     fontWeight: 500,
     color: "#ffffff",
-    background: "#1e1e1e",
+    background: "#5865F2", /* Discord purple */
     border: "none",
     borderRadius: "6px",
     cursor: "pointer",
@@ -143,9 +142,9 @@ const defaultButtonStyle = {
     padding: "10px 24px",
     fontSize: "14px",
     fontWeight: 500,
-    color: "#374151",
-    background: "#ffffff",
-    border: "1px solid #d1d5db",
+    color: "#e6e9ef",
+    background: "#202737", /* Button base */
+    border: "1px solid rgba(255, 255, 255, 0.1)",
     borderRadius: "6px",
     cursor: "pointer",
     transition: "all 0.2s",
@@ -157,7 +156,7 @@ const dialogOverlayStyle = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -165,7 +164,7 @@ const dialogOverlayStyle = {
 };
 
 const dialogStyle = {
-    background: '#ffffff',
+    background: '#151a22', /* Table surface */
     borderRadius: '8px',
     padding: '24px',
     minWidth: '400px',
@@ -317,7 +316,7 @@ export default function ColumnPicker({ columnSettings, onToggleColumn, onClose, 
                                             alignItems: 'center',
                                             transition: 'background-color 0.2s',
                                         }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#202737'}
                                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                     >
                                         <span>{preset.name}</span>

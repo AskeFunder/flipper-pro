@@ -21,6 +21,7 @@ import BrowseItemsPage from "./pages/BrowseItemsPage";
 import ItemDetailPage from "./pages/ItemDetailPage";
 import ChangelogPage from "./pages/ChangelogPage";
 import SearchBar from "./components/SearchBar";
+import DiscordBanner from "./components/DiscordBanner";
 import { nameToSlug } from "./utils/formatting";
 
 
@@ -78,18 +79,36 @@ function App() {
           [`& .MuiDrawer-paper`]: {
             width: drawerWidth,
             boxSizing: "border-box",
-            backgroundColor: "#1e1e1e",
-            color: "#fff",
-            borderRight: "1px solid #333",
+            backgroundColor: "#151a22", /* Table surface */
+            color: "#e6e9ef",
+            borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+            background: "linear-gradient(180deg, #151a22 0%, #0f1115 100%)",
           },
         }}
       >
-        <Toolbar>
-          <Typography variant="h6" noWrap component="div">
+        <Toolbar sx={{ 
+          background: "linear-gradient(135deg, #5865F2 0%, #4752C4 100%)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+          minHeight: "64px !important",
+        }}>
+          <Typography 
+            variant="h6" 
+            noWrap 
+            component="div"
+            sx={{
+              fontWeight: 700,
+              fontSize: "20px",
+              letterSpacing: "-0.5px",
+              background: "linear-gradient(135deg, #ffffff 0%, #e6e9ef 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
             FlipperPro
           </Typography>
         </Toolbar>
-        <List>
+        <List sx={{ padding: "8px" }}>
           {navItems.map((item) => (
             <ListItemButton
               key={item.id}
@@ -107,18 +126,42 @@ function App() {
               disableRipple
               disableTouchRipple
               sx={{
-                color: "#fff",
+                color: "#9aa4b2",
+                borderRadius: "8px",
+                marginBottom: "4px",
+                padding: "12px 16px",
+                transition: "all 0.2s",
                 "&.Mui-selected": {
-                  backgroundColor: "#333",
-                  fontWeight: "bold",
+                  backgroundColor: "#202737",
+                  color: "#e6e9ef",
+                  fontWeight: 600,
+                  "& .MuiListItemIcon-root": {
+                    color: "#5865F2",
+                  },
                 },
                 "&:hover": {
-                  backgroundColor: "#2a2a2a",
+                  backgroundColor: "#181e27",
+                  color: "#e6e9ef",
+                  "& .MuiListItemIcon-root": {
+                    color: "#5865F2",
+                  },
                 },
               }}
             >
-              <ListItemIcon sx={{ color: "#fff" }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
+              <ListItemIcon sx={{ 
+                color: "inherit",
+                minWidth: "40px",
+                transition: "color 0.2s",
+              }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText 
+                primary={item.label}
+                primaryTypographyProps={{
+                  fontSize: "14px",
+                  fontWeight: "inherit",
+                }}
+              />
             </ListItemButton>
           ))}
         </List>
@@ -129,8 +172,8 @@ function App() {
         component="main"
         sx={{
           flexGrow: 1,
-          bgcolor: "#ffffff",
-          color: "#111",
+          bgcolor: "#0f1115", /* App background */
+          color: "#e6e9ef", /* Primary text */
           display: "flex",
           flexDirection: "column",
           height: "100vh",
@@ -140,7 +183,7 @@ function App() {
           maxWidth: "100%",
         }}
       >
-        {/* Search Bar - Floating in top right corner, no layout impact */}
+        {/* Search Bar and Discord Badge - Floating in top right corner */}
         {(page === "browse" || selectedItemName) && (
           <Box
             sx={{
@@ -150,10 +193,13 @@ function App() {
               zIndex: 1000,
               p: 2,
               display: "flex",
+              alignItems: "center",
+              gap: "12px",
               justifyContent: "flex-end",
               pointerEvents: "auto",
             }}
           >
+            <DiscordBanner />
             <SearchBar
               onItemClick={handleItemClick}
               onSearch={(query) => {
