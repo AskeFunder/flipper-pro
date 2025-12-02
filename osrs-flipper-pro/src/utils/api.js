@@ -9,6 +9,9 @@ const API_BASE =
     ? "https://api.flipper-pro.com"
     : "http://localhost:3001");
 
+// Export API_BASE for checking if local API is enabled
+export const isLocalApi = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
+
 /**
  * Make an API request
  * @param {string} endpoint - API endpoint (e.g., '/api/items/browse')

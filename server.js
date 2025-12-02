@@ -1,4 +1,17 @@
-require("dotenv").config();
+// Load environment variables - support .env.dev or .env.prod based on NODE_ENV
+const path = require('path');
+const fs = require('fs');
+const envFile = process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
+const envPath = path.join(__dirname, envFile);
+
+// Check if .env file exists
+if (!fs.existsSync(envPath)) {
+    console.error(`[ERROR] Environment file not found: ${envPath}`);
+    console.error(`[ERROR] Please create ${envFile} file in the project root with required variables (PORT, DATABASE_URL, etc.)`);
+    process.exit(1);
+}
+
+require("dotenv").config({ path: envPath });
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');

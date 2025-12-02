@@ -25,8 +25,10 @@ import FilterBar from "./components/FilterBar";
 import DiscordBanner from "./components/DiscordBanner";
 import MobileDiscordBanner from "./components/mobile/MobileDiscordBanner";
 import MobileNavBar from "./components/mobile/MobileNavBar";
+import LocalApiBanner from "./components/LocalApiBanner";
 import { useMobile } from "./hooks/useMobile";
 import { nameToSlug } from "./utils/formatting";
+import { isLocalApi } from "./utils/api";
 
 
 const drawerWidth = 220;
@@ -75,6 +77,9 @@ function App() {
 
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100%", maxWidth: "100%", overflowX: "hidden" }}>
+      {/* Local API Banner - Shows at top when connected to local API */}
+      <LocalApiBanner />
+      
       {/* DESKTOP ONLY: Sidebar */}
       {!isMobile && (
         <Drawer
@@ -189,6 +194,7 @@ function App() {
           width: "100%",
           maxWidth: "100%",
           paddingBottom: 0, // No padding - pagination and bottom nav are fixed
+          paddingTop: 0, // No padding top - search bar handles spacing
         }}
       >
         {/* Search Bar and Discord Badge - Floating in top right corner (Desktop) / Floating header (Mobile) */}
@@ -196,7 +202,7 @@ function App() {
           <Box
             sx={{
               position: isMobile ? "fixed" : "absolute",
-              top: isMobile ? 0 : 0,
+              top: isMobile ? (isLocalApi ? "40px" : 0) : (isLocalApi ? "40px" : 0),
               right: isMobile ? 0 : "16px",
               left: isMobile ? 0 : "auto",
               zIndex: isMobile ? 1100 : 1000,
@@ -235,7 +241,7 @@ function App() {
           <Box
             sx={{
               position: "fixed",
-              top: "50px", // Below sticky search bar container
+              top: isLocalApi ? "90px" : "50px", // Below LocalApiBanner (40px) + search bar (50px)
               left: 0,
               right: 0,
               zIndex: 1050, // Below search results (1200) but above content
@@ -258,7 +264,9 @@ function App() {
             width: "100%",
             maxWidth: "100%",
             paddingBottom: isMobile ? 0 : "24px", // No padding on mobile - pagination and bottom nav are fixed
-            paddingTop: isMobile && (page === "browse" || selectedItemName) ? "90px" : 0, // Space for search bar (50px) + Discord banner (40px)
+            paddingTop: isMobile && (page === "browse" || selectedItemName) 
+              ? (isLocalApi ? "130px" : "90px") // Space for LocalApiBanner (40px) + search bar (50px) + Discord banner (40px)
+              : (isLocalApi ? "40px" : 0), // Space for LocalApiBanner when visible (applies to both mobile and desktop)
             marginBottom: isMobile && (page === "browse" || selectedItemName) ? "48px" : 0, // Space for bottom nav (48px) - pagination is fixed above it
           }}
         >
