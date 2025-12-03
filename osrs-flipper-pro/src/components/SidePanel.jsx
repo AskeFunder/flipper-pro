@@ -54,6 +54,8 @@ export default function SidePanel({ item, onClose }) {
     
     // Chart state
     const [timeRange, setTimeRange] = useState('12H');
+    const [zoomBounds, setZoomBounds] = useState({ min: null, max: null });
+    const chartRef = useRef(null);
     
     // Canonical granularity selector (independent from chart granularity)
     const [selectedCanonicalGranularity, setSelectedCanonicalGranularity] = useState('1h');
@@ -310,7 +312,16 @@ export default function SidePanel({ item, onClose }) {
                                     <p style={loadingTextStyle}>Loading chart...</p>
                                 </div>
                             ) : (
-                                <PriceChart priceData={chartData} timeRange={timeRange} height={isMobile && typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.45, 400) : 300} />
+                                <PriceChart 
+                                    ref={chartRef}
+                                    priceData={chartData} 
+                                    timeRange={timeRange} 
+                                    zoomBounds={zoomBounds}
+                                    onZoomChange={(min, max) => {
+                                        setZoomBounds({ min, max });
+                                    }}
+                                    height={isMobile && typeof window !== 'undefined' ? Math.min(window.innerHeight * 0.45, 400) : 300} 
+                                />
                             )}
                         </div>
                         
